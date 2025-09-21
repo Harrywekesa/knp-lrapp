@@ -148,6 +148,7 @@ if ($selected_unit_id > 0) {
                     <li><a href="units.php">Units</a></li>
                     <li><a href="materials.php" class="active">Materials</a></li>
                     <li><a href="users.php">Manage Users</a></li>
+                    <li><a href="sales.php">Commerce</a></li>
                     <li><a href="settings.php">Theme Settings</a></li>
                     <li><a href="../logout.php">Logout</a></li>
                 </ul>

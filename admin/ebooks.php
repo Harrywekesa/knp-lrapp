@@ -127,6 +127,7 @@ $ebooks = getAllEbooks();
                     <li><a href="programs.php">Manage Programs</a></li>
                     <li><a href="ebooks.php" class="active">Manage E-books</a></li>
                     <li><a href="trainers.php">Approve Trainers</a></li>
+                    <li><a href="sales.php">Commerce</a></li>
                     <li><a href="settings.php">Theme Settings</a></li>
                     <li><a href="../logout.php">Logout</a></li>
                 </ul>

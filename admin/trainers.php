@@ -59,6 +59,7 @@ $approvedTrainers = $stmt->fetchAll();
                     <li><a href="users.php">Manage Users</a></li>
                     <li><a href="Programs.php">Manage Programs</a></li>
                     <li><a href="trainers.php" class="active">Approve Trainers</a></li>
+                    <li><a href="sales.php">Commerce</a></li>
                     <li><a href="settings.php">Theme Settings</a></li>
                     <li><a href="../logout.php">Logout</a></li>
                 </ul>

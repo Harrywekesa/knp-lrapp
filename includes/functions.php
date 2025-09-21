@@ -929,4 +929,286 @@ function getAIDifficultyAssessment($user_id, $course_id) {
         ]
     ];
 }
+// M-Pesa payment functions
+function initiateMpesaPayment($user_id, $material_id, $amount, $phone_number) {
+    // In a real implementation, you would integrate with M-Pesa Daraja API
+    // This is a simulation for demonstration purposes
+    
+    // Generate a unique reference
+    $reference = 'MPESA_' . uniqid();
+    
+    // Create payment record
+    global $pdo;
+    $stmt = $pdo->prepare("INSERT INTO payments (user_id, amount, method, reference, status) VALUES (?, ?, 'mpesa', ?, 'pending')");
+    if ($stmt->execute([$user_id, $amount, $reference])) {
+        $payment_id = $pdo->lastInsertId();
+        
+        // Create purchase record
+        $stmt = $pdo->prepare("INSERT INTO purchases (user_id, material_id, payment_id) VALUES (?, ?, ?)");
+        if ($stmt->execute([$user_id, $material_id, $payment_id])) {
+            // In a real implementation, you would call M-Pesa API here
+            // For now, we'll simulate success
+            return [
+                'success' => true,
+                'message' => 'M-Pesa payment initiated successfully',
+                'checkout_url' => 'https://mpesa.example.com/checkout/' . $reference,
+                'reference' => $reference
+            ];
+        } else {
+            return [
+                'success' => false,
+                'message' => 'Failed to create purchase record'
+            ];
+        }
+    } else {
+        return [
+            'success' => false,
+            'message' => 'Failed to create payment record'
+        ];
+    }
+}
+
+function processMpesaCallback($reference, $transaction_id, $status) {
+    global $pdo;
+    
+    // Update payment status
+    $stmt = $pdo->prepare("UPDATE payments SET transaction_id = ?, status = ? WHERE reference = ?");
+    if ($stmt->execute([$transaction_id, $status, $reference])) {
+        // If payment is completed, grant access to material
+        if ($status === 'completed') {
+            // Get payment details
+            $stmt = $pdo->prepare("SELECT * FROM payments WHERE reference = ?");
+            $stmt->execute([$reference]);
+            $payment = $stmt->fetch();
+            
+            if ($payment) {
+                // Get purchase details
+                $stmt = $pdo->prepare("SELECT * FROM purchases WHERE payment_id = ?");
+                $stmt->execute([$payment['id']]);
+                $purchase = $stmt->fetch();
+                
+                if ($purchase) {
+                    // Grant access by updating material status
+                    $stmt = $pdo->prepare("UPDATE unit_materials SET access_level = 'registered' WHERE id = ?");
+                    $stmt->execute([$purchase['material_id']]);
+                }
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
+// PayPal payment functions
+function initiatePaypalPayment($user_id, $material_id, $amount) {
+    // In a real implementation, you would integrate with PayPal API
+    // This is a simulation for demonstration purposes
+    
+    // Generate a unique reference
+    $reference = 'PAYPAL_' . uniqid();
+    
+    // Create payment record
+    global $pdo;
+    $stmt = $pdo->prepare("INSERT INTO payments (user_id, amount, method, reference, status) VALUES (?, ?, 'paypal', ?, 'pending')");
+    if ($stmt->execute([$user_id, $amount, $reference])) {
+        $payment_id = $pdo->lastInsertId();
+        
+        // Create purchase record
+        $stmt = $pdo->prepare("INSERT INTO purchases (user_id, material_id, payment_id) VALUES (?, ?, ?)");
+        if ($stmt->execute([$user_id, $material_id, $payment_id])) {
+            // In a real implementation, you would redirect to PayPal checkout
+            // For now, we'll simulate success
+            return [
+                'success' => true,
+                'message' => 'PayPal payment initiated successfully',
+                'checkout_url' => 'https://paypal.example.com/checkout/' . $reference,
+                'reference' => $reference
+            ];
+        } else {
+            return [
+                'success' => false,
+                'message' => 'Failed to create purchase record'
+            ];
+        }
+    } else {
+        return [
+            'success' => false,
+            'message' => 'Failed to create payment record'
+        ];
+    }
+}
+
+// Sales tracking functions
+function getAllSales() {
+    global $pdo;
+    $stmt = $pdo->query("SELECT p.*, u.name as user_name, um.title as material_title FROM payments p JOIN users u ON p.user_id = u.id JOIN purchases pur ON p.id = pur.payment_id JOIN unit_materials um ON pur.material_id = um.id WHERE p.status = 'completed' ORDER BY p.created_at DESC");
+    return $stmt->fetchAll();
+}
+
+function getMonthlySales() {
+    global $pdo;
+    $stmt = $pdo->query("SELECT DATE_FORMAT(created_at, '%Y-%m') as month, COUNT(*) as count, SUM(amount) as amount FROM payments WHERE status = 'completed' GROUP BY DATE_FORMAT(created_at, '%Y-%m') ORDER BY month DESC");
+    return $stmt->fetchAll();
+}
+
+function getTopSellingMaterials() {
+    global $pdo;
+    $stmt = $pdo->query("SELECT um.*, COUNT(pur.id) as sales_count, SUM(p.amount) as total_revenue, AVG(um.price) as avg_price FROM unit_materials um JOIN purchases pur ON um.id = pur.material_id JOIN payments p ON pur.payment_id = p.id WHERE p.status = 'completed' GROUP BY um.id ORDER BY sales_count DESC LIMIT 10");
+    return $stmt->fetchAll();
+}
+
+function getSalesByUser($user_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT p.*, um.title as material_title FROM payments p JOIN purchases pur ON p.id = pur.payment_id JOIN unit_materials um ON pur.material_id = um.id WHERE p.user_id = ? AND p.status = 'completed' ORDER BY p.created_at DESC");
+    $stmt->execute([$user_id]);
+    return $stmt->fetchAll();
+}
+
+function getSalesByMaterial($material_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT p.*, u.name as user_name FROM payments p JOIN purchases pur ON p.id = pur.payment_id JOIN users u ON p.user_id = u.id WHERE pur.material_id = ? AND p.status = 'completed' ORDER BY p.created_at DESC");
+    $stmt->execute([$material_id]);
+    return $stmt->fetchAll();
+}
+
+function getSalesReport($from_date = null, $to_date = null, $method = null) {
+    global $pdo;
+    
+    $query = "SELECT p.*, u.name as user_name, um.title as material_title FROM payments p JOIN users u ON p.user_id = u.id JOIN purchases pur ON p.id = pur.payment_id JOIN unit_materials um ON pur.material_id = um.id WHERE p.status = 'completed'";
+    $params = [];
+    
+    if ($from_date) {
+        $query .= " AND p.created_at >= ?";
+        $params[] = $from_date;
+    }
+    
+    if ($to_date) {
+        $query .= " AND p.created_at <= ?";
+        $params[] = $to_date;
+    }
+    
+    if ($method) {
+        $query .= " AND p.method = ?";
+        $params[] = $method;
+    }
+    
+    $query .= " ORDER BY p.created_at DESC";
+    
+    $stmt = $pdo->prepare($query);
+    $stmt->execute($params);
+    return $stmt->fetchAll();
+}
+
+// Revenue calculation functions
+function getTotalRevenue() {
+    global $pdo;
+    $stmt = $pdo->query("SELECT SUM(amount) as total FROM payments WHERE status = 'completed'");
+    $result = $stmt->fetch();
+    return $result['total'] ?? 0;
+}
+
+function getMonthlyRevenue($month = null) {
+    global $pdo;
+    
+    if ($month) {
+        $stmt = $pdo->prepare("SELECT SUM(amount) as total FROM payments WHERE status = 'completed' AND DATE_FORMAT(created_at, '%Y-%m') = ?");
+        $stmt->execute([$month]);
+    } else {
+        $stmt = $pdo->query("SELECT SUM(amount) as total FROM payments WHERE status = 'completed' AND DATE_FORMAT(created_at, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')");
+    }
+    
+    $result = $stmt->fetch();
+    return $result['total'] ?? 0;
+}
+
+function getRevenueByMaterial() {
+    global $pdo;
+    $stmt = $pdo->query("SELECT um.title, SUM(p.amount) as revenue FROM payments p JOIN purchases pur ON p.id = pur.payment_id JOIN unit_materials um ON pur.material_id = um.id WHERE p.status = 'completed' GROUP BY um.id ORDER BY revenue DESC");
+    return $stmt->fetchAll();
+}
+
+function getRevenueByUser() {
+    global $pdo;
+    $stmt = $pdo->query("SELECT u.name, SUM(p.amount) as revenue FROM payments p JOIN users u ON p.user_id = u.id WHERE p.status = 'completed' GROUP BY u.id ORDER BY revenue DESC");
+    return $stmt->fetchAll();
+}
+
+// Export functions
+function exportSalesToCSV($sales_data) {
+    $filename = 'sales_report_' . date('Y-m-d') . '.csv';
+    $fp = fopen('php://output', 'w');
+    
+    // Set headers for CSV download
+    header('Content-Type: text/csv');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+    
+    // Add CSV headers
+    fputcsv($fp, ['ID', 'User', 'Material', 'Amount', 'Method', 'Reference', 'Date', 'Status']);
+    
+    // Add data rows
+    foreach ($sales_data as $sale) {
+        fputcsv($fp, [
+            $sale['id'],
+            $sale['user_name'],
+            $sale['material_title'] ?? 'N/A',
+            'KES ' . number_format($sale['amount'], 2),
+            $sale['method'],
+            $sale['reference'] ?? 'N/A',
+            date('Y-m-d H:i:s', strtotime($sale['created_at'])),
+            $sale['status']
+        ]);
+    }
+    
+    fclose($fp);
+    exit();
+}
+
+// Material functions
+function getMaterialsByTrainer($trainer_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT um.*, u.name as unit_name, p.name as program_name, d.name as department_name FROM unit_materials um JOIN units u ON um.unit_id = u.id JOIN programs p ON u.program_id = p.id JOIN departments d ON p.department_id = d.id JOIN courses c ON u.id = c.unit_id WHERE c.trainer_id = ? AND um.status = 'published' ORDER BY um.created_at DESC");
+    $stmt->execute([$trainer_id]);
+    return $stmt->fetchAll();
+}
+
+function createMaterial($unit_id, $title, $description, $type, $access_level, $price, $file_path, $cover_image = null) {
+    global $pdo;
+    $stmt = $pdo->prepare("INSERT INTO unit_materials (unit_id, title, description, type, access_level, price, file_path, cover_image, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'published')");
+    return $stmt->execute([$unit_id, $title, $description, $type, $access_level, $price, $file_path, $cover_image]);
+}
+
+function updateMaterial($id, $title, $description, $type, $access_level, $price, $cover_image = null) {
+    global $pdo;
+    if ($cover_image) {
+        $stmt = $pdo->prepare("UPDATE unit_materials SET title = ?, description = ?, type = ?, access_level = ?, price = ?, cover_image = ? WHERE id = ?");
+        return $stmt->execute([$title, $description, $type, $access_level, $price, $cover_image, $id]);
+    } else {
+        $stmt = $pdo->prepare("UPDATE unit_materials SET title = ?, description = ?, type = ?, access_level = ?, price = ? WHERE id = ?");
+        return $stmt->execute([$title, $description, $type, $access_level, $price, $id]);
+    }
+}
+
+function deleteMaterial($id) {
+    global $pdo;
+    $stmt = $pdo->prepare("UPDATE unit_materials SET status = 'archived' WHERE id = ?");
+    return $stmt->execute([$id]);
+}
+
+// User functions
+function getUserPurchases($user_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT pur.*, um.title as material_title, um.type as material_type, p.amount, p.method, p.reference FROM purchases pur JOIN unit_materials um ON pur.material_id = um.id JOIN payments p ON pur.payment_id = p.id WHERE pur.user_id = ? AND p.status = 'completed' ORDER BY pur.created_at DESC");
+    $stmt->execute([$user_id]);
+    return $stmt->fetchAll();
+}
+
+function getPurchaseById($id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT pur.*, um.title as material_title, um.type as material_type, p.amount, p.method, p.reference, u.name as user_name FROM purchases pur JOIN unit_materials um ON pur.material_id = um.id JOIN payments p ON pur.payment_id = p.id JOIN users u ON pur.user_id = u.id WHERE pur.id = ?");
+    $stmt->execute([$id]);
+    return $stmt->fetch();
+}
+
 ?>

@@ -87,6 +87,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['purchase_material']))
     }
 }
 
+// Handle M-Pesa payment initiation
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_mpesa_payment'])) {
+    $phone_number = $_POST['phone_number'];
+    
+    if (empty($phone_number)) {
+        $error = "Please enter your phone number";
+    } else {
+        // Validate Kenyan phone number format
+        if (!preg_match('/^2547\d{8}$/', $phone_number) && !preg_match('/^07\d{8}$/', $phone_number)) {
+            $error = "Please enter a valid Kenyan phone number (e.g., 254712345678 or 0712345678)";
+        } else {
+            // Format phone number for M-Pesa (convert 07 to 2547)
+            if (substr($phone_number, 0, 2) === '07') {
+                $phone_number = '254' . substr($phone_number, 1);
+            }
+            
+            // Initiate M-Pesa payment
+            $result = initiateMpesaPayment($user['id'], $material['id'], $material['price'], $phone_number);
+            
+            if ($result['success']) {
+                $success = "M-Pesa payment initiated. Please check your phone for the payment prompt.";
+                $mpesa_checkout_url = $result['checkout_url'];
+            } else {
+                $error = "Failed to initiate M-Pesa payment: " . $result['message'];
+            }
+        }
+    }
+}
+
 // Get related materials
 $relatedMaterials = getMaterialsByUnit($material['unit_id']);
 // Remove current material from related list
@@ -128,7 +157,7 @@ $materialTypes = [
     <style>
         :root {
             --primary-color: <?php echo $theme['primary_color']; ?>;
-            --secondary-color: <?php echo $theme['secondary_color']; ?>;
+            --secondary-color: <?php echo $theme['secondary-color']; ?>;
             --accent-color: <?php echo $theme['accent-color']; ?>;
         }
     </style>
@@ -186,9 +215,9 @@ $materialTypes = [
                                 <div style="flex: 1; min-width: 200px;">
                                     <div style="position: relative;">
                                         <?php if ($material['cover_image']): ?>
-                                            <img src="../<?php echo htmlspecialchars($material['cover_image']); ?>" alt="Cover" style="width: 100%; height: 200px; object-fit: cover; border-radius: 4px;">
+                                            <img src="../<?php echo htmlspecialchars($material['cover_image']); ?>" alt="Cover" style="width: 100%; height: 200px; object-fit: cover; border-radius: 4px 4px 0 0;">
                                         <?php else: ?>
-                                            <div style="background: #ddd; height: 200px; display: flex; align-items: center; justify-content: center; border-radius: 4px;">
+                                            <div style="background: #ddd; height: 200px; display: flex; align-items: center; justify-content: center; border-radius: 4px 4px 0 0;">
                                                 <span style="font-size: 3rem;">
                                                     <?php echo $materialIcons[$material['type']] ?? '📁'; ?>
                                                 </span>
@@ -260,15 +289,59 @@ $materialTypes = [
                                             <div class="card-header">
                                                 <h4>Purchase This Material</h4>
                                             </div>
-                                            <form method="POST">
-                                                <div style="padding: 1rem;">
-                                                    <p>This premium material costs <strong>KES <?php echo number_format($material['price'], 2); ?></strong>.</p>
-                                                    <p>After purchase, you'll have unlimited access to this material.</p>
-                                                    <button type="submit" name="purchase_material" class="btn btn-block" style="margin-top: 1rem;">
-                                                        Purchase for KES <?php echo number_format($material['price'], 2); ?>
-                                                    </button>
+                                            <div style="padding: 1rem;">
+                                                <p>This premium material costs <strong>KES <?php echo number_format($material['price'], 2); ?></strong>.</p>
+                                                <p>After purchase, you'll have unlimited access to this material.</p>
+                                                
+                                                <div style="margin-top: 1rem;">
+                                                    <h4>Select Payment Method</h4>
+                                                    <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                                                        <button id="show-mpesa-form" class="btn" style="flex: 1; padding: 1rem; text-align: center;">
+                                                            <div style="font-size: 2rem; margin-bottom: 0.5rem;">📱</div>
+                                                            <div>M-Pesa</div>
+                                                        </button>
+                                                        <button id="show-paypal-form" class="btn btn-secondary" style="flex: 1; padding: 1rem; text-align: center;">
+                                                            <div style="font-size: 2rem; margin-bottom: 0.5rem;">💳</div>
+                                                            <div>PayPal</div>
+                                                        </button>
+                                                    </div>
+                                                    
+                                                    <div id="mpesa-payment-form" class="card" style="display: none; margin-top: 1.5rem;">
+                                                        <div class="card-header">
+                                                            <h4>M-Pesa Payment</h4>
+                                                            <p>Enter your phone number to receive payment prompt</p>
+                                                        </div>
+                                                        <form method="POST">
+                                                            <div class="form-group">
+                                                                <label for="phone_number">Phone Number *</label>
+                                                                <input type="tel" id="phone_number" name="phone_number" class="form-control" placeholder="254712345678" required>
+                                                                <p style="margin: 0.25rem 0 0; color: #666; font-size: 0.85rem;">
+                                                                    Enter your Kenyan phone number starting with 254 or 07
+                                                                </p>
+                                                            </div>
+                                                            
+                                                            <div class="form-group">
+                                                                <button type="submit" name="initiate_mpesa_payment" class="btn">Initiate M-Pesa Payment</button>
+                                                                <button type="button" id="cancel-mpesa" class="btn btn-secondary" style="margin-left: 1rem;">Cancel</button>
+                                                            </div>
+                                                        </form>
+                                                    </div>
+                                                    
+                                                    <div id="paypal-payment-form" class="card" style="display: none; margin-top: 1.5rem;">
+                                                        <div class="card-header">
+                                                            <h4>PayPal Payment</h4>
+                                                            <p>Redirect to PayPal for secure payment</p>
+                                                        </div>
+                                                        <div style="padding: 1rem;">
+                                                            <p>You will be redirected to PayPal to complete your payment of KES <?php echo number_format($material['price'], 2); ?>.</p>
+                                                            <form method="POST">
+                                                                <button type="submit" name="initiate_paypal_payment" class="btn">Proceed to PayPal</button>
+                                                                <button type="button" id="cancel-paypal" class="btn btn-secondary" style="margin-left: 1rem;">Cancel</button>
+                                                            </form>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            </form>
+                                            </div>
                                         </div>
                                         <?php endif; ?>
                                     </div>
@@ -378,13 +451,139 @@ $materialTypes = [
                                 <div style="width: 80px; height: 80px; border-radius: 50%; background: #ddd; margin: 0 auto 1rem; display: flex; align-items: center; justify-content: center; font-size: 2rem;">
                                     <?php echo strtoupper(substr($course['name'] ?? 'C', 0, 1)); ?>
                                 </div>
-                                <h4><?php echo htmlspecialchars($course['name'] ?? 'N/A'); ?></h4>
-                                <p style="margin: 0.25rem 0 0; color: #666;"><?php echo htmlspecialchars($course['code'] ?? 'N/A'); ?></p>
-                                <p style="margin: 0.25rem 0 0; color: #666;"><?php echo $course['duration'] ?? 'N/A'; ?> years</p>
+                                <h4><?php echo htmlspecialchars($course['name']); ?></h4>
+                                <p style="margin: 0.25rem 0 0; color: #666;"><?php echo htmlspecialchars($course['code']); ?></p>
+                                <p style="margin: 0.25rem 0 0; color: #666;"><?php echo $course['duration']; ?> years</p>
                             </div>
                             
                             <div style="padding: 1rem;">
                                 <p><?php echo htmlspecialchars($course['description'] ?? 'No description available'); ?></p>
                                 
                                 <div style="margin-top: 1rem;">
-                                    <a href="course.php?id=<?php echo $course['id']; ?>" class="btn btn-
+                                    <a href="course.php?id=<?php echo $course['id']; ?>" class="btn btn-block">View Course Details</a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Unit Information</h3>
+                            </div>
+                            
+                            <div style="padding: 1rem;">
+                                <h4><?php echo htmlspecialchars($unit['name']); ?></h4>
+                                <p><strong>Code:</strong> <?php echo htmlspecialchars($unit['code']); ?></p>
+                                <p><strong>Year:</strong> <?php echo $unit['year']; ?></p>
+                                <p><strong>Semester:</strong> <?php echo $unit['semester']; ?></p>
+                                <p><strong>Credits:</strong> <?php echo $unit['credits']; ?></p>
+                                <p><?php echo htmlspecialchars($unit['description'] ?? 'No description available'); ?></p>
+                                
+                                <div style="margin-top: 1rem;">
+                                    <a href="unit.php?id=<?php echo $unit['id']; ?>" class="btn btn-block">View Unit Details</a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <?php if (!empty($relatedMaterials)): ?>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Related Materials</h3>
+                            </div>
+                            
+                            <div style="max-height: 400px; overflow-y: auto;">
+                                <?php foreach ($relatedMaterials as $related): ?>
+                                <div class="related-material" style="padding: 1rem; border-bottom: 1px solid #eee;">
+                                    <div style="display: flex; align-items: center;">
+                                        <div style="margin-right: 1rem; font-size: 1.5rem;">
+                                            <?php echo $materialIcons[$related['type']] ?? '📁'; ?>
+                                        </div>
+                                        <div style="flex: 1;">
+                                            <h4 style="margin: 0; font-size: 1rem;">
+                                                <a href="material.php?id=<?php echo $related['id']; ?>" style="color: var(--primary-color); text-decoration: none;">
+                                                    <?php echo htmlspecialchars($related['title']); ?>
+                                                </a>
+                                            </h4>
+                                            <p style="margin: 0.25rem 0 0; color: #666; font-size: 0.85rem;">
+                                                <?php echo $materialTypes[$related['type']] ?? ucfirst($related['type']); ?>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer mt-auto py-3 bg-dark text-light">
+        <div class="container">
+            <div style="border-top: 1px solid #444; padding: 1rem 0; text-align: center; color: #aaa;">
+                <p>&copy; 2023 <?php echo APP_NAME; ?>. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="../assets/js/main.js"></script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        
+        main {
+            flex: 1 0 auto;
+        }
+        
+        footer {
+            flex-shrink: 0;
+        }
+        
+        header nav ul li a.active {
+            border-bottom: 2px solid white;
+        }
+        
+        .related-material:hover {
+            background-color: #f8fafc;
+        }
+    </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const showMpesaBtn = document.getElementById('show-mpesa-form');
+            const showPaypalBtn = document.getElementById('show-paypal-form');
+            const mpesaForm = document.getElementById('mpesa-payment-form');
+            const paypalForm = document.getElementById('paypal-payment-form');
+            const cancelMpesaBtn = document.getElementById('cancel-mpesa');
+            const cancelPaypalBtn = document.getElementById('cancel-paypal');
+            
+            showMpesaBtn.addEventListener('click', function() {
+                mpesaForm.style.display = 'block';
+                paypalForm.style.display = 'none';
+                showMpesaBtn.classList.add('active');
+                showPaypalBtn.classList.remove('active');
+            });
+            
+            showPaypalBtn.addEventListener('click', function() {
+                paypalForm.style.display = 'block';
+                mpesaForm.style.display = 'none';
+                showPaypalBtn.classList.add('active');
+                showMpesaBtn.classList.remove('active');
+            });
+            
+            cancelMpesaBtn.addEventListener('click', function() {
+                mpesaForm.style.display = 'none';
+                showMpesaBtn.classList.remove('active');
+            });
+            
+            cancelPaypalBtn.addEventListener('click', function() {
+                paypalForm.style.display = 'none';
+                showPaypalBtn.classList.remove('active');
+            });
+        });
+    </script>
+</body>
+</html>

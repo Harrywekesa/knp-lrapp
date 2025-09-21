@@ -46,6 +46,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <li><a href="users.php">Manage Users</a></li>
                     <li><a href="programs.php">Manage Programs</a></li>
                     <li><a href="settings.php">Theme Settings</a></li>
+                    <li><a href="ai_assistant.php">Your AI Assistant</a></li>
+                    <li><a href="sales.php">Commerce</a></li>
                     <li><a href="../logout.php">Logout</a></li>
                 </ul>
             </nav>

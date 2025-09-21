@@ -92,6 +92,7 @@ $users = getAllUsers();
                     <li><a href="users.php" class="active">Manage Users</a></li>
                     <li><a href="Programs.php">Manage Programs</a></li>
                     <li><a href="trainers.php">Approve Trainers</a></li>
+                    <li><a href="sales.php">Commerce</a></li>
                     <li><a href="settings.php">Theme Settings</a></li>
                     <li><a href="../logout.php">Logout</a></li>
                 </ul>

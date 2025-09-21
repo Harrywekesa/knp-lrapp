@@ -39,6 +39,7 @@ $pendingTrainers = getPendingTrainers();
                     <li><a href="Programs.php">Manage Programs</a></li>
                     <li><a href="trainers.php">Approve Trainers</a></li>
                     <li><a href="settings.php">Theme Settings</a></li>
+                    <li><a href="ai_assistant.php">Your AI Assistant</a></li>
                     <li><a href="../logout.php">Logout</a></li>
                 </ul>
             </nav>

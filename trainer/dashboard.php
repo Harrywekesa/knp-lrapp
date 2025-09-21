@@ -82,6 +82,7 @@ $forumTopics = array_slice($forumTopics, 0, 5);
                     <li><a href="live_classes.php">Live Classes</a></li>
                     <li><a href="assignments.php">Assignments</a></li>
                     <li><a href="forum.php">Discussion Forum</a></li>
+                    <li><a href="ai_assistant.php">Your AI Assistant</a></li>
                     <li><a href="profile.php">Profile</a></li>
                     <li><a href="../logout.php">Logout</a></li>
                 </ul>
@@ -117,6 +118,11 @@ $forumTopics = array_slice($forumTopics, 0, 5);
                         <div class="stat-icon">💬</div>
                         <div class="stat-number"><?php echo count($forumTopics); ?></div>
                         <div class="stat-label">Forum Topics</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🤖</div>
+                        <div class="stat-number">AI</div>
+                        <div class="stat-label">Assistant</div>
                     </div>
                 </div>
             </div>
@@ -282,6 +288,26 @@ $forumTopics = array_slice($forumTopics, 0, 5);
                     </div>
                 <?php endif; ?>
             </div>
+            <div class="card">
+            <div class="card-header">
+                <h2>AI Assistant</h2>
+                <p>Get intelligent help with your studies</p>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                <a href="ai_assistant.php" class="btn" style="text-align: center; padding: 1.5rem;">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">🤖</div>
+                    <div>Ask AI Assistant</div>
+                </a>
+                <a href="ai_assistant.php?action=generate_quiz" class="btn" style="text-align: center; padding: 1.5rem;">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">📝</div>
+                    <div>Generate Quiz</div>
+                </a>
+                <a href="ai_assistant.php?action=summarize_notes" class="btn" style="text-align: center; padding: 1.5rem;">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">📚</div>
+                    <div>Summarize Notes</div>
+                </a>
+            </div>
+        </div>
         </div>
     </main>
 

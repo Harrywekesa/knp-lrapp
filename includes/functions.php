@@ -764,4 +764,169 @@ function getUnitsByCourse($course_id) {
     $stmt->execute([$course_id]);
     return $stmt->fetchAll();
 }
+// AI Assistant functions
+function processAIRequest($question, $context = '', $user = null) {
+    // Simulate AI processing
+    // In a real implementation, you would connect to an AI service like OpenAI
+    
+    // For demonstration, we'll return simulated responses based on keywords
+    $question = strtolower($question);
+    
+    if (strpos($question, 'hello') !== false || strpos($question, 'hi') !== false) {
+        return "Hello! How can I assist you with your studies today?";
+    }
+    
+    if (strpos($question, 'quiz') !== false || strpos($question, 'test') !== false) {
+        return "I can help you create a quiz. Please provide the subject matter or course content you'd like to create a quiz for, and I'll generate relevant questions for you.";
+    }
+    
+    if (strpos($question, 'summarize') !== false || strpos($question, 'notes') !== false) {
+        return "I can help summarize your notes. Please paste the content you'd like summarized, and I'll create a concise summary for easier studying.";
+    }
+    
+    if (strpos($question, 'explain') !== false || strpos($question, 'concept') !== false) {
+        return "I can explain complex concepts in simple terms. Please tell me what concept you'd like me to explain, and I'll break it down for you with examples.";
+    }
+    
+    if (strpos($question, 'essay') !== false || strpos($question, 'write') !== false) {
+        return "I can help you with essay writing. Please provide the topic and any specific requirements, and I'll help you structure and develop your essay.";
+    }
+    
+    if (strpos($question, 'help') !== false) {
+        return "I can help with various academic tasks including:\n\n1. Answering questions about course materials\n2. Generating quizzes and tests\n3. Summarizing lengthy texts\n4. Explaining complex concepts\n5. Assisting with essay writing\n6. Providing study tips and techniques\n\nWhat specific help do you need today?";
+    }
+    
+    // Context-aware responses
+    if ($context) {
+        return "Based on your context about {$context}, here's my response to your question: {$question}\n\nI've analyzed the relevant course materials and provided an answer tailored to your specific program. Is there anything else you'd like me to elaborate on?";
+    }
+    
+    // General response
+    return "Thank you for your question: \"{$question}\". As your AI assistant, I'm here to help with your academic journey. While I can't provide specific answers without more context, I can help you explore this topic further.\n\nConsider:\n1. Reviewing your course materials\n2. Asking more specific questions\n3. Using the 'Explain Concept' feature for complex topics\n\nHow else can I assist you today?";
+}
+
+function generateQuiz($subject, $num_questions = 10) {
+    // Simulate quiz generation
+    $questions = [];
+    
+    for ($i = 1; $i <= $num_questions; $i++) {
+        $questions[] = [
+            'id' => $i,
+            'question' => "Sample question {$i} about {$subject}",
+            'options' => [
+                "Option A for question {$i}",
+                "Option B for question {$i}",
+                "Option C for question {$i}",
+                "Option D for question {$i}"
+            ],
+            'correct_answer' => rand(0, 3)
+        ];
+    }
+    
+    return $questions;
+}
+
+function summarizeText($text, $max_length = 200) {
+    // Simulate text summarization
+    $words = explode(' ', $text);
+    if (count($words) <= $max_length) {
+        return $text;
+    }
+    
+    $summary_words = array_slice($words, 0, $max_length);
+    return implode(' ', $summary_words) . '...';
+}
+
+function explainConcept($concept) {
+    // Simulate concept explanation
+    return "Here's an explanation of '{$concept}':\n\nThis is a fundamental concept in your field of study. To understand it better:\n\n1. First, consider the basic principles...\n2. Then examine how it applies in practice...\n3. Finally, review examples and case studies...\n\nFor more detailed information, I recommend reviewing your course materials or asking your instructor for clarification.";
+}
+
+function writeEssay($topic, $length = 'medium') {
+    // Simulate essay writing assistance
+    $lengths = [
+        'short' => 300,
+        'medium' => 500,
+        'long' => 1000
+    ];
+    
+    $word_count = $lengths[$length] ?? 500;
+    
+    return "Here's an outline for your essay on '{$topic}':\n\nIntroduction:\n- Hook to grab reader attention\n- Background information on the topic\n- Thesis statement presenting your main argument\n\nBody Paragraphs:\n1. First supporting point with evidence\n2. Second supporting point with examples\n3. Third supporting point with analysis\n\nConclusion:\n- Restate thesis in new words\n- Summarize main points\n- Final thought or call to action\n\nThis structure will help you organize your thoughts and create a compelling essay.";
+}
+
+// Integration with existing functions
+function getAIRecommendations($user_id, $course_id = null) {
+    // Get user's enrolled courses
+    $enrollments = getUserEnrollments($user_id);
+    $courses = [];
+    
+    foreach ($enrollments as $enrollment) {
+        $course = getProgramById($enrollment['program_id']);
+        if ($course) {
+            $courses[] = $course;
+        }
+    }
+    
+    // Generate recommendations based on enrolled courses
+    $recommendations = [];
+    
+    foreach ($courses as $course) {
+        // Simulate AI-generated recommendations
+        $recommendations[] = [
+            'title' => "Study tips for {$course['name']}",
+            'type' => 'study_tips',
+            'content' => "Focus on understanding core concepts in {$course['name']}. Practice regularly and seek help when needed.",
+            'course_id' => $course['id']
+        ];
+        
+        $recommendations[] = [
+            'title' => "Recommended resources for {$course['name']}",
+            'type' => 'resources',
+            'content' => "Check out the latest e-books and lecture notes for {$course['name']} to enhance your learning.",
+            'course_id' => $course['id']
+        ];
+    }
+    
+    return $recommendations;
+}
+
+function getAIDifficultyAssessment($user_id, $course_id) {
+    // Simulate AI assessment of user's difficulty with a course
+    $enrollments = getUserEnrollments($user_id);
+    $enrolled = false;
+    
+    foreach ($enrollments as $enrollment) {
+        if ($enrollment['program_id'] == $course_id) {
+            $enrolled = true;
+            break;
+        }
+    }
+    
+    if (!$enrolled) {
+        return "You are not enrolled in this course.";
+    }
+    
+    // Simulate assessment
+    $difficulty_levels = ['Easy', 'Moderate', 'Challenging', 'Difficult'];
+    $difficulty = $difficulty_levels[array_rand($difficulty_levels)];
+    
+    $tips = [
+        'Easy' => "You're doing well in this course! Consider challenging yourself with additional materials.",
+        'Moderate' => "You're performing at an average level. Keep practicing and reviewing regularly.",
+        'Challenging' => "This course may require extra effort. Focus on weak areas and seek help from your instructor.",
+        'Difficult' => "You're finding this course challenging. Consider forming study groups or getting tutoring."
+    ];
+    
+    return [
+        'difficulty' => $difficulty,
+        'tip' => $tips[$difficulty],
+        'recommended_actions' => [
+            "Review previous materials",
+            "Attend office hours",
+            "Form a study group",
+            "Practice with sample problems"
+        ]
+    ];
+}
 ?>

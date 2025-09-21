@@ -71,6 +71,7 @@ $assignments = getAssignmentsByCourse($unit['id']);
                     <li><a href="live_classes.php">Live Classes</a></li>
                     <li><a href="assignments.php">Assignments</a></li>
                     <li><a href="forum.php">Discussion Forum</a></li>
+                    <li><a href="ai_assistant.php">Your AI Assistant</a></li>
                     <li><a href="profile.php">Profile</a></li>
                     <li><a href="../logout.php">Logout</a></li>
                 </ul>

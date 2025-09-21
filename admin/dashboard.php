@@ -129,6 +129,10 @@ $pendingTrainers = getPendingTrainers();
                         <div style="font-size: 2rem; margin-bottom: 0.5rem;">📚</div>
                         <div>Manage Programs</div>
                     </a>
+                    <a href="ebooks.php" class="btn" style="text-align: center; padding: 1.5rem;">
+                        <div style="font-size: 2rem; margin-bottom: 0.5rem;">📚</div>
+                        <div>Manage Ebooks</div>
+                    </a>
                     <a href="trainers.php" class="btn" style="text-align: center; padding: 1.5rem;">
                         <div style="font-size: 2rem; margin-bottom: 0.5rem;">👨‍🏫</div>
                         <div>Approve Trainers</div>
@@ -144,7 +148,7 @@ $pendingTrainers = getPendingTrainers();
 
     <footer>
         <div class="container">
-            <p>&copy; 2023 <?php echo APP_NAME; ?>. All rights reserved.</p>
+            <p>&copy; 2025 <?php echo APP_NAME; ?>. All rights reserved.</p>
         </div>
     </footer>
 

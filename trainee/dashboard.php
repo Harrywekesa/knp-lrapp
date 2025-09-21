@@ -6,35 +6,51 @@ redirectIfNotAllowed('trainee');
 $user = getUserById($_SESSION['user_id']);
 $theme = getThemeSettings();
 
-// Get enrolled courses for this trainee
+// Get user's enrollments
 $enrollments = getUserEnrollments($user['id']);
 
-// Get courses from enrollments
-$enrolledCourses = [];
+// Get enrolled programs
+$enrolledPrograms = [];
 foreach ($enrollments as $enrollment) {
-    $course = getCourseById($enrollment['program_id']);
-    if ($course) {
-        $enrolledCourses[] = $course;
+    $program = getProgramById($enrollment['program_id']);
+    if ($program) {
+        $enrolledPrograms[] = $program;
     }
 }
 
-// Get recent materials (ebooks)
-$ebooks = getAllEbooks();
+// Get registered units
+$registeredUnits = [];
+foreach ($enrollments as $enrollment) {
+    $units = getRegisteredUnits($enrollment['id']);
+    $registeredUnits = array_merge($registeredUnits, $units);
+}
 
-// Get upcoming classes for enrolled courses
+// Get recent materials
+$recentMaterials = [];
+foreach ($registeredUnits as $unit) {
+    $unitMaterials = getMaterialsByUnit($unit['unit_id']);
+    $recentMaterials = array_merge($recentMaterials, $unitMaterials);
+}
+
+// Sort by date and limit to 5 most recent
+usort($recentMaterials, function($a, $b) {
+    return strtotime($b['created_at']) - strtotime($a['created_at']);
+});
+$recentMaterials = array_slice($recentMaterials, 0, 5);
+
+// Get upcoming classes
 $upcomingClasses = [];
-foreach ($enrolledCourses as $course) {
-    $courseClasses = getClassesByCourse($course['id']);
-    foreach ($courseClasses as $class) {
-        // Only include future classes
+foreach ($registeredUnits as $unit) {
+    $unitClasses = getClassesByUnit($unit['unit_id']);
+    foreach ($unitClasses as $class) {
         if (strtotime($class['start_time']) > time()) {
-            $class['course_title'] = $course['name'];
+            $class['unit_name'] = $unit['unit_name'];
             $upcomingClasses[] = $class;
         }
     }
 }
 
-// Sort classes by date and limit to 5 most recent
+// Sort by date and limit to 5 most recent
 usort($upcomingClasses, function($a, $b) {
     return strtotime($a['start_time']) - strtotime($b['start_time']);
 });
@@ -42,12 +58,12 @@ $upcomingClasses = array_slice($upcomingClasses, 0, 5);
 
 // Get recent assignments
 $recentAssignments = [];
-foreach ($enrolledCourses as $course) {
-    $courseAssignments = getAssignmentsByCourse($course['id']);
-    $recentAssignments = array_merge($recentAssignments, $courseAssignments);
+foreach ($registeredUnits as $unit) {
+    $unitAssignments = getAssignmentsByUnit($unit['unit_id']);
+    $recentAssignments = array_merge($recentAssignments, $unitAssignments);
 }
 
-// Sort assignments by due date and limit to 5 most recent
+// Sort by due date and limit to 5 most recent
 usort($recentAssignments, function($a, $b) {
     return strtotime($a['due_date']) - strtotime($b['due_date']);
 });
@@ -68,7 +84,7 @@ $notifications = getUnreadNotifications($user['id']);
         :root {
             --primary-color: <?php echo $theme['primary_color']; ?>;
             --secondary-color: <?php echo $theme['secondary_color']; ?>;
-            --accent-color: <?php echo $theme['accent_color']; ?>;
+            --accent-color: <?php echo $theme['accent-color']; ?>;
         }
     </style>
 </head>
@@ -102,13 +118,13 @@ $notifications = getUnreadNotifications($user['id']);
                 <div class="stats-grid">
                     <div class="stat-card">
                         <div class="stat-icon">📚</div>
-                        <div class="stat-number"><?php echo count($enrolledCourses); ?></div>
-                        <div class="stat-label">Enrolled Courses</div>
+                        <div class="stat-number"><?php echo count($enrolledPrograms); ?></div>
+                        <div class="stat-label">Enrolled Programs</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">📖</div>
-                        <div class="stat-number"><?php echo count($ebooks); ?></div>
-                        <div class="stat-label">Available E-Books</div>
+                        <div class="stat-number"><?php echo count($registeredUnits); ?></div>
+                        <div class="stat-label">Registered Units</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">🎬</div>
@@ -158,40 +174,79 @@ $notifications = getUnreadNotifications($user['id']);
             
             <div class="card">
                 <div class="card-header">
-                    <h2>My Courses</h2>
-                    <p>Courses you are currently enrolled in</p>
+                    <h2>My Programs</h2>
+                    <p>Programs you are currently enrolled in</p>
                 </div>
                 
-                <?php if (empty($enrolledCourses)): ?>
-                    <div class="alert">You haven't enrolled in any courses yet.</div>
+                <?php if (empty($enrolledPrograms)): ?>
+                    <div class="alert">You haven't enrolled in any programs yet.</div>
                     <div style="text-align: center; margin: 2rem 0;">
-                        <a href="courses.php" class="btn">Browse Available Courses</a>
+                        <a href="courses.php" class="btn">Browse Available Programs</a>
                     </div>
                 <?php else: ?>
                     <div class="grid">
-                        <?php foreach (array_slice($enrolledCourses, 0, 3) as $course): ?>
-                        <div class="course-card">
-                            <div style="background: #ddd; height: 150px; display: flex; align-items: center; justify-content: center; border-radius: 4px 4px 0 0;">
-                                <?php echo htmlspecialchars($course['code'] ?? 'COURSE'); ?>
+                        <?php foreach (array_slice($enrolledPrograms, 0, 3) as $program): ?>
+                        <div class="program-card">
+                            <div style="background: var(--primary-color); color: white; padding: 1rem; border-radius: 4px 4px 0 0;">
+                                <h3 style="margin: 0;"><?php echo htmlspecialchars($program['name']); ?></h3>
+                                <p style="margin: 0.5rem 0 0; opacity: 0.9;"><?php echo htmlspecialchars($program['code']); ?></p>
                             </div>
-                            <div class="course-card-content">
-                                <h3><?php echo htmlspecialchars($course['name']); ?></h3>
-                                <p><?php echo htmlspecialchars(substr($course['description'] ?? 'No description available', 0, 100)) . '...'; ?></p>
-                                <div style="display: flex; justify-content: space-between; margin-top: 1rem;">
-                                    <span><?php echo $course['duration']; ?> years</span>
-                                    <a href="course.php?id=<?php echo $course['id']; ?>" class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">View Details</a>
+                            <div class="program-card-content">
+                                <p><?php echo htmlspecialchars(substr($program['description'] ?? 'No description available', 0, 100)) . '...'; ?></p>
+                                <div style="margin-top: 1rem;">
+                                    <a href="program.php?id=<?php echo $program['id']; ?>" class="btn btn-block">View Units</a>
                                 </div>
                             </div>
                         </div>
                         <?php endforeach; ?>
                     </div>
-                    <div style="text-align: center; margin-top: 1.5rem;">
-                        <a href="courses.php" class="btn btn-secondary">View All Courses</a>
-                    </div>
                 <?php endif; ?>
             </div>
             
             <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Recent Materials</h2>
+                        <p>Latest learning materials</p>
+                    </div>
+                    
+                    <?php if (empty($recentMaterials)): ?>
+                        <div class="alert">No recent materials available.</div>
+                    <?php else: ?>
+                        <div style="max-height: 300px; overflow-y: auto;">
+                            <?php foreach ($recentMaterials as $material): ?>
+                            <div class="material-item" style="padding: 1rem; border-bottom: 1px solid #eee;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <h4 style="margin: 0; font-size: 1rem;">
+                                        <?php echo htmlspecialchars($material['title']); ?>
+                                    </h4>
+                                    <span style="color: var(--accent-color); font-size: 0.85rem; font-weight: 500;">
+                                        <?php 
+                                        switch($material['type']) {
+                                            case 'lecture_note': echo 'Lecture Note'; break;
+                                            case 'assignment': echo 'Assignment'; break;
+                                            case 'video': echo 'Video'; break;
+                                            case 'ebook': echo 'E-book'; break;
+                                            default: echo 'Resource'; break;
+                                        }
+                                        ?>
+                                    </span>
+                                </div>
+                                <p style="margin: 0.25rem 0 0; color: #666; font-size: 0.9rem;">
+                                    <?php echo htmlspecialchars($material['unit_name'] ?? 'N/A'); ?>
+                                </p>
+                                <p style="margin: 0.25rem 0 0; color: #666; font-size: 0.85rem;">
+                                    <?php echo date('M j, Y', strtotime($material['created_at'])); ?>
+                                </p>
+                                <div style="margin-top: 0.5rem;">
+                                    <a href="material.php?id=<?php echo $material['id']; ?>" class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">View Material</a>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+                
                 <div class="card">
                     <div class="card-header">
                         <h2>Upcoming Classes</h2>
@@ -213,14 +268,14 @@ $notifications = getUnreadNotifications($user['id']);
                                     </span>
                                 </div>
                                 <p style="margin: 0.25rem 0 0; color: #666; font-size: 0.9rem;">
-                                    <?php echo htmlspecialchars($class['course_title']); ?>
+                                    <?php echo htmlspecialchars($class['unit_name'] ?? 'N/A'); ?>
                                 </p>
                                 <p style="margin: 0.25rem 0 0; color: #666; font-size: 0.85rem;">
                                     <?php echo date('g:i A', strtotime($class['start_time'])); ?> - 
                                     <?php echo date('g:i A', strtotime($class['end_time'])); ?>
                                 </p>
                                 <div style="margin-top: 0.5rem;">
-                                    <a href="live_class.php?id=<?php echo $class['id']; ?>" class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">Join Class</a>
+                                    <a href="class.php?id=<?php echo $class['id']; ?>" class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">Join Class</a>
                                 </div>
                             </div>
                             <?php endforeach; ?>
@@ -263,7 +318,10 @@ $notifications = getUnreadNotifications($user['id']);
                                     </span>
                                 </div>
                                 <p style="margin: 0.25rem 0 0; color: #666; font-size: 0.9rem;">
-                                    Due: <?php echo date('M j, Y', strtotime($assignment['due_date'])); ?>
+                                    <?php echo htmlspecialchars($assignment['unit_name'] ?? 'N/A'); ?>
+                                </p>
+                                <p style="margin: 0.25rem 0 0; color: #666; font-size: 0.85rem;">
+                                    Due: <?php echo date('M j, Y g:i A', strtotime($assignment['due_date'])); ?>
                                 </p>
                                 <p style="margin: 0.25rem 0 0; color: #666; font-size: 0.85rem;">
                                     Max Points: <?php echo $assignment['max_points']; ?>
@@ -276,50 +334,6 @@ $notifications = getUnreadNotifications($user['id']);
                         </div>
                     <?php endif; ?>
                 </div>
-            </div>
-            
-            <div class="card">
-                <div class="card-header">
-                    <h2>Recommended E-Books</h2>
-                    <p>Suggested reading materials</p>
-                </div>
-                
-                <?php if (empty($ebooks)): ?>
-                    <div class="alert">No e-books available at this time.</div>
-                <?php else: ?>
-                    <div class="grid">
-                        <?php foreach (array_slice($ebooks, 0, 4) as $ebook): ?>
-                        <div class="ebook-card">
-                            <div style="position: relative;">
-                                <?php if ($ebook['cover_image']): ?>
-                                    <img src="../<?php echo htmlspecialchars($ebook['cover_image']); ?>" alt="Cover" style="width: 100%; height: 150px; object-fit: cover; border-radius: 4px 4px 0 0;">
-                                <?php else: ?>
-                                    <div style="background: #ddd; height: 150px; display: flex; align-items: center; justify-content: center; border-radius: 4px 4px 0 0;">
-                                        📖
-                                    </div>
-                                <?php endif; ?>
-                                <?php if ($ebook['price'] > 0): ?>
-                                    <div style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 0.25rem 0.5rem; border-radius: 4px;">
-                                        KES <?php echo number_format($ebook['price'], 2); ?>
-                                    </div>
-                                <?php else: ?>
-                                    <div style="position: absolute; top: 10px; right: 10px; background: rgba(16, 185, 129, 0.8); color: white; padding: 0.25rem 0.5rem; border-radius: 4px;">
-                                        FREE
-                                    </div>
-                                <?php endif; ?>
-                            </div>
-                            <div class="ebook-card-content">
-                                <h3><?php echo htmlspecialchars($ebook['title']); ?></h3>
-                                <p><strong>Author:</strong> <?php echo htmlspecialchars($ebook['author'] ?? 'Unknown'); ?></p>
-                                <p><?php echo htmlspecialchars(substr($ebook['description'] ?? 'No description', 0, 80)) . '...'; ?></p>
-                                <div style="margin-top: 1rem;">
-                                    <a href="ebook.php?id=<?php echo $ebook['id']; ?>" class="btn btn-block">View Details</a>
-                                </div>
-                            </div>
-                        </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
             </div>
         </div>
     </main>
@@ -352,7 +366,28 @@ $notifications = getUnreadNotifications($user['id']);
             border-bottom: 2px solid white;
         }
         
-        .notification-item:hover, .class-item:hover, .assignment-item:hover {
+        .program-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+            transition: transform 0.3s;
+        }
+        
+        .program-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .program-card-content {
+            padding: 1rem;
+        }
+        
+        .program-card-content h3 {
+            margin-bottom: 0.5rem;
+            color: var(--primary-color);
+        }
+        
+        .material-item:hover, .class-item:hover, .assignment-item:hover {
             background-color: #f8fafc;
         }
     </style>

@@ -142,6 +142,7 @@ $users = getAllUsers();
                             <select id="role" name="role" class="form-control" required>
                                 <option value="trainee">Trainee</option>
                                 <option value="trainer">Trainer</option>
+                                <option value="Presenter">Presenter</option>
                                 <option value="exam_officer">Exam Officer</option>
                                 <option value="admin">Admin</option>
                             </select>
@@ -182,6 +183,7 @@ $users = getAllUsers();
                                     <select name="role" onchange="this.form.submit()" class="form-control" style="width: auto; display: inline-block;">
                                         <option value="trainee" <?php echo $u['role'] === 'trainee' ? 'selected' : ''; ?>>Trainee</option>
                                         <option value="trainer" <?php echo $u['role'] === 'trainer' ? 'selected' : ''; ?>>Trainer</option>
+                                        <option value="presenter" <?php echo $u['role'] === 'presenter' ? 'selected' : ''; ?>>Presenter</option>
                                         <option value="exam_officer" <?php echo $u['role'] === 'exam_officer' ? 'selected' : ''; ?>>Exam Officer</option>
                                         <option value="admin" <?php echo $u['role'] === 'admin' ? 'selected' : ''; ?>>Admin</option>
                                     </select>

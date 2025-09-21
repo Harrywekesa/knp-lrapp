@@ -342,11 +342,38 @@ function registerUnit($enrollment_id, $unit_id) {
 
 function getRegisteredUnits($enrollment_id) {
     global $pdo;
-    $stmt = $pdo->prepare("SELECT ur.*, u.name as unit_name, u.code as unit_code FROM unit_registrations ur JOIN units u ON ur.unit_id = u.id WHERE ur.enrollment_id = ? AND ur.status = 'registered'");
+    $stmt = $pdo->prepare("
+        SELECT 
+            ur.*, 
+            u.name AS unit_name, 
+            u.code AS unit_code, 
+            u.year, 
+            u.semester, 
+            u.credits
+        FROM unit_registrations ur
+        JOIN units u ON ur.unit_id = u.id
+        WHERE ur.enrollment_id = ? AND ur.status = 'registered'
+    ");
     $stmt->execute([$enrollment_id]);
-    return $stmt->fetchAll();
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+// (Place this at the end of your functions.php file or in an appropriate section)
+function updateTrainerProfile($userId, $name, $email, $bio, $phone, $specialization, $office_location) {
+    // Example using PDO, adjust as needed for your DB connection
+    global $pdo;
+    $sql = "UPDATE users SET name = :name, email = :email, bio = :bio, phone = :phone, specialization = :specialization, office_location = :office_location WHERE id = :id";
+    $stmt = $pdo->prepare($sql);
+    return $stmt->execute([
+        ':name' => $name,
+        ':email' => $email,
+        ':bio' => $bio,
+        ':phone' => $phone,
+        ':specialization' => $specialization,
+        ':office_location' => $office_location,
+        ':id' => $userId
+    ]);
+}
 // Theme functions
 function getThemeSettings() {
     global $pdo;
@@ -627,6 +654,114 @@ function getEbooksByTrainer($trainer_id) {
     global $pdo;
     $stmt = $pdo->prepare("SELECT e.*, u.name as trainer_name FROM ebooks e LEFT JOIN users u ON e.trainer_id = u.id WHERE e.trainer_id = ? ORDER BY e.created_at DESC");
     $stmt->execute([$trainer_id]);
+    return $stmt->fetchAll();
+}
+// Forum functions
+function getForumTopicById($id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT ft.*, u.name as author, p.name as program_name FROM forum_topics ft JOIN users u ON ft.user_id = u.id LEFT JOIN programs p ON ft.program_id = p.id WHERE ft.id = ?");
+    $stmt->execute([$id]);
+    return $stmt->fetch();
+}
+
+function getForumRepliesByTopic($topic_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT fr.*, u.name as author FROM forum_replies fr JOIN users u ON fr.user_id = u.id WHERE fr.topic_id = ? ORDER BY fr.created_at ASC");
+    $stmt->execute([$topic_id]);
+    return $stmt->fetchAll();
+}
+
+function updateForumTopicViews($topic_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("UPDATE forum_topics SET views = views + 1 WHERE id = ?");
+    return $stmt->execute([$topic_id]);
+}
+
+// Assignment functions
+function getAssignmentById($id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT a.*, p.name as program_name, u.name as author FROM assignments a JOIN programs p ON a.program_id = p.id JOIN users u ON a.author_id = u.id WHERE a.id = ?");
+    $stmt->execute([$id]);
+    return $stmt->fetch();
+}
+
+function getAssignmentSubmissionById($id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT * FROM assignment_submissions WHERE id = ?");
+    $stmt->execute([$id]);
+    return $stmt->fetch();
+}
+
+function getAssignmentSubmissionsByAssignment($assignment_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT s.*, u.name as student_name FROM assignment_submissions s JOIN users u ON s.user_id = u.id WHERE s.assignment_id = ? ORDER BY s.submitted_at DESC");
+    $stmt->execute([$assignment_id]);
+    return $stmt->fetchAll();
+}
+
+function gradeAssignmentSubmission($submission_id, $points_awarded, $feedback) {
+    global $pdo;
+    $stmt = $pdo->prepare("UPDATE assignment_submissions SET points_awarded = ?, feedback = ?, graded_at = NOW() WHERE id = ?");
+    return $stmt->execute([$points_awarded, $feedback, $submission_id]);
+}
+// Enrollment functions
+function getEnrollmentById($id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT * FROM enrollments WHERE id = ?");
+    $stmt->execute([$id]);
+    return $stmt->fetch();
+}
+
+function enrollUserInProgram($user_id, $program_id) {
+    global $pdo;
+    $enrollment_date = date('Y-m-d');
+    $stmt = $pdo->prepare("INSERT INTO enrollments (user_id, program_id, enrollment_date, status) VALUES (?, ?, ?, 'active')");
+    return $stmt->execute([$user_id, $program_id, $enrollment_date]);
+}
+
+function registerUnitForEnrollment($enrollment_id, $unit_id) {
+    global $pdo;
+    $registration_date = date('Y-m-d');
+    $stmt = $pdo->prepare("INSERT INTO unit_registrations (enrollment_id, unit_id, registration_date, status) VALUES (?, ?, ?, 'registered')");
+    return $stmt->execute([$enrollment_id, $unit_id, $registration_date]);
+}
+// (Place this at the end of your functions.php file or after other user-related functions)
+function updateUserPassword($userId, $newPassword) {
+    global $conn; // Make sure $conn is your database connection variable
+    $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
+    $stmt = $conn->prepare("UPDATE users SET password = ? WHERE id = ?");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param("si", $hashedPassword, $userId);
+    $result = $stmt->execute();
+    $stmt->close();
+    return $result;
+}
+//get course by trainer and program
+function getCoursesByTrainerAndProgram($trainer_id, $program_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT * FROM courses WHERE trainer_id = ? AND program_id = ? ORDER BY created_at DESC");
+    $stmt->execute([$trainer_id, $program_id]);
+    return $stmt->fetchAll();
+}
+//assign course to trainer  
+function assignCourseToTrainer($course_id, $trainer_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("UPDATE courses SET trainer_id = ? WHERE id = ?");
+    return $stmt->execute([$trainer_id, $course_id]);
+}
+//remove trainer from course
+function removeTrainerFromCourse($course_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("UPDATE courses SET trainer_id = NULL WHERE id = ?");
+    return $stmt->execute([$course_id]);
+}
+//getunits by course
+function getUnitsByCourse($course_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT * FROM units WHERE course_id = ? AND status = 'active' ORDER BY name ASC");
+    $stmt->execute([$course_id]);
     return $stmt->fetchAll();
 }
 ?>

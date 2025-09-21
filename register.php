@@ -94,6 +94,7 @@ $theme = getThemeSettings();
                         <select id="role" name="role" class="form-control" required>
                             <option value="trainee">Trainee</option>
                             <option value="trainer">Trainer</option>
+                            <option value="trainer">Presenter</option>
                             <option value="exam_officer">Exam Officer</option>
                         </select>
                     </div>
@@ -112,7 +113,7 @@ $theme = getThemeSettings();
 
     <footer>
         <div class="container">
-            <p>&copy; 2023 <?php echo APP_NAME; ?>. All rights reserved.</p>
+            <p>&copy; 2025 <?php echo APP_NAME; ?>. All rights reserved.</p>
         </div>
     </footer>
 

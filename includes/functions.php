@@ -764,6 +764,7 @@ function getUnitsByCourse($course_id) {
     $stmt->execute([$course_id]);
     return $stmt->fetchAll();
 }
+
 // AI Assistant functions
 function processAIRequest($question, $context = '', $user = null) {
     // Simulate AI processing
@@ -1070,7 +1071,22 @@ function getSalesByMaterial($material_id) {
     $stmt->execute([$material_id]);
     return $stmt->fetchAll();
 }
-
+function recordSale($user_id, $material_id, $amount, $method, $reference) {
+    global $pdo;
+    
+    // Create payment record
+    $stmt = $pdo->prepare("INSERT INTO payments (user_id, amount, method, reference, status) VALUES (?, ?, ?, ?, 'completed')");
+    if ($stmt->execute([$user_id, $amount, $method, $reference])) {
+        $payment_id = $pdo->lastInsertId();
+        
+        // Create purchase record
+        $stmt = $pdo->prepare("INSERT INTO purchases (user_id, material_id, payment_id) VALUES (?, ?, ?)");
+        if ($stmt->execute([$user_id, $material_id, $payment_id])) {
+            return true;
+        }
+    }
+    return false;
+}
 function getSalesReport($from_date = null, $to_date = null, $method = null) {
     global $pdo;
     
@@ -1554,20 +1570,28 @@ function getAllExams() {
     return $stmt->fetchAll();
 }
 
-function getExamsByUnit($unit_id) {
+function scheduleExam($unit_id, $title, $description, $exam_date, $start_time, $end_time, $max_points, $exam_type) {
     global $pdo;
-    $stmt = $pdo->prepare("SELECT * FROM exams WHERE unit_id = ? AND status != 'cancelled' ORDER BY exam_date DESC, start_time DESC");
-    $stmt->execute([$unit_id]);
-    return $stmt->fetchAll();
+    $stmt = $pdo->prepare("INSERT INTO exams (unit_id, title, description, exam_date, start_time, end_time, max_points, exam_type, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')");
+    return $stmt->execute([$unit_id, $title, $description, $exam_date, $start_time, $end_time, $max_points, $exam_type]);
 }
-
+function uploadExamPaper($exam_id, $title, $file_path, $version) {
+    global $pdo;
+    $stmt = $pdo->prepare("INSERT INTO exam_question_papers (exam_id, title, file_path, version, status) VALUES (?, ?, ?, ?, 'approved')");
+    return $stmt->execute([$exam_id, $title, $file_path, $version]);
+}
 function getExamById($id) {
     global $pdo;
     $stmt = $pdo->prepare("SELECT e.*, u.name as unit_name, p.name as program_name, d.name as department_name FROM exams e JOIN units u ON e.unit_id = u.id JOIN programs p ON u.program_id = p.id JOIN departments d ON p.department_id = d.id WHERE e.id = ?");
     $stmt->execute([$id]);
     return $stmt->fetch();
 }
-
+function getExamPapers($exam_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT * FROM exam_question_papers WHERE exam_id = ? ORDER BY created_at DESC");
+    $stmt->execute([$exam_id]);
+    return $stmt->fetchAll();
+}
 function getExamsWithResults() {
     global $pdo;
     $stmt = $pdo->query("SELECT e.*, u.name as unit_name, p.name as program_name, d.name as department_name, COUNT(er.id) as results_count FROM exams e JOIN units u ON e.unit_id = u.id JOIN programs p ON u.program_id = p.id JOIN departments d ON p.department_id = d.id LEFT JOIN exam_results er ON e.id = er.exam_id WHERE e.status != 'cancelled' GROUP BY e.id ORDER BY e.exam_date DESC, e.start_time DESC");
@@ -1576,11 +1600,32 @@ function getExamsWithResults() {
 
 function getRecentExams($limit = 10) {
     global $pdo;
-    $stmt = $pdo->prepare("SELECT e.*, u.name as unit_name, p.name as program_name, d.name as department_name FROM exams e JOIN units u ON e.unit_id = u.id JOIN programs p ON u.program_id = p.id JOIN departments d ON p.department_id = d.id WHERE e.status != 'cancelled' ORDER BY e.exam_date DESC, e.start_time DESC LIMIT ?");
-    $stmt->execute([$limit]);
+    $stmt = $pdo->prepare("SELECT e.*, u.name as unit_name, p.name as program_name, d.name as department_name FROM exams e JOIN units u ON e.unit_id = u.id JOIN programs p ON u.program_id = p.id JOIN departments d ON p.department_id = d.id WHERE e.status != 'cancelled' ORDER BY e.exam_date DESC, e.start_time DESC LIMIT " . (int)$limit);
+    $stmt->execute();
+    return $stmt->fetchAll();
+}
+function lockExamResults($exam_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("UPDATE exams SET results_locked = TRUE, locked_at = NOW() WHERE id = ?");
+    return $stmt->execute([$exam_id]);
+}
+function getLockedExams() {
+    global $pdo;
+    $stmt = $pdo->query("SELECT e.*, u.name as unit_name, p.name as program_name, d.name as department_name FROM exams e JOIN units u ON e.unit_id = u.id JOIN programs p ON u.program_id = p.id JOIN departments d ON p.department_id = d.id WHERE e.results_locked = TRUE ORDER BY e.locked_at DESC");
     return $stmt->fetchAll();
 }
 
+function getUnlockedExams() {
+    global $pdo;
+    $stmt = $pdo->query("SELECT e.*, u.name as unit_name, p.name as program_name, d.name as department_name FROM exams e JOIN units u ON e.unit_id = u.id JOIN programs p ON u.program_id = p.id JOIN departments d ON p.department_id = d.id WHERE e.results_locked = FALSE ORDER BY e.exam_date DESC");
+    return $stmt->fetchAll();
+}
+
+function unlockExamResults($exam_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("UPDATE exams SET results_locked = FALSE, locked_at = NULL WHERE id = ?");
+    return $stmt->execute([$exam_id]);
+}
 // Exam result functions
 function recordExamResult($exam_id, $student_id, $points_awarded) {
     global $pdo;
@@ -1675,8 +1720,8 @@ function exportResultsToCSV($exam_id) {
 
 function getRecentResults($limit = 10) {
     global $pdo;
-    $stmt = $pdo->prepare("SELECT er.*, u.name as student_name, e.title as exam_title, un.name as unit_name, p.name as program_name, d.name as department_name FROM exam_results er JOIN users u ON er.student_id = u.id JOIN exams e ON er.exam_id = e.id JOIN units un ON e.unit_id = un.id JOIN programs p ON un.program_id = p.id JOIN departments d ON p.department_id = d.id ORDER BY er.graded_at DESC LIMIT ?");
-    $stmt->execute([$limit]);
+    $stmt = $pdo->prepare("SELECT er.*, u.name as student_name, e.title as exam_title, un.name as unit_name, p.name as program_name, d.name as department_name FROM exam_results er JOIN users u ON er.user_id = u.id JOIN exams e ON er.exam_id = e.id JOIN units un ON e.unit_id = un.id JOIN programs p ON un.program_id = p.id JOIN departments d ON p.department_id = d.id ORDER BY er.graded_at DESC LIMIT " . (int)$limit);
+    $stmt->execute();
     return $stmt->fetchAll();
 }
 
@@ -1685,6 +1730,24 @@ function getAttendanceRecordsBySession($session_id) {
     global $pdo;
     $stmt = $pdo->prepare("SELECT ar.*, u.name as student_name FROM attendance_records ar JOIN users u ON ar.user_id = u.id WHERE ar.session_id = ? ORDER BY ar.joined_at DESC");
     $stmt->execute([$session_id]);
+    return $stmt->fetchAll();
+}
+function getAttendanceRecordsByClass($class_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT ar.*, u.name as student_name, s.title as session_title FROM attendance_records ar JOIN users u ON ar.user_id = u.id JOIN sessions s ON ar.session_id = s.id WHERE s.class_id = ? ORDER BY ar.joined_at DESC");
+    $stmt->execute([$class_id]);
+    return $stmt->fetchAll();
+}
+function getAttendanceRecordsByCourse($course_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT ar.*, u.name as student_name, s.title as session_title, cl.title as class_title FROM attendance_records ar JOIN users u ON ar.user_id = u.id JOIN sessions s ON ar.session_id = s.id JOIN classes cl ON s.class_id = cl.id JOIN units un ON cl.unit_id = un.id JOIN programs p ON un.program_id = p.id WHERE p.id = ? ORDER BY ar.joined_at DESC");
+    $stmt->execute([$course_id]);
+    return $stmt->fetchAll();
+}
+function getAttendanceRecordsByDepartment($department_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT ar.*, u.name as student_name, s.title as session_title, cl.title as class_title, un.name as unit_name, p.name as program_name FROM attendance_records ar JOIN users u ON ar.user_id = u.id JOIN sessions s ON ar.session_id = s.id JOIN classes cl ON s.class_id = cl.id JOIN units un ON cl.unit_id = un.id JOIN programs p ON un.program_id = p.id JOIN departments d ON p.department_id = d.id WHERE d.id = ? ORDER BY ar.joined_at DESC");
+    $stmt->execute([$department_id]);
     return $stmt->fetchAll();
 }
 
@@ -1696,8 +1759,8 @@ function getAllSessions() {
 
 function getRecentAttendanceRecords($limit = 10) {
     global $pdo;
-    $stmt = $pdo->prepare("SELECT ar.*, u.name as student_name, s.title as session_title, c.title as class_title, un.name as unit_name, p.name as program_name, d.name as department_name FROM attendance_records ar JOIN users u ON ar.user_id = u.id JOIN sessions s ON ar.session_id = s.id JOIN classes c ON s.class_id = c.id JOIN units un ON c.unit_id = un.id JOIN programs p ON un.program_id = p.id JOIN departments d ON p.department_id = d.id ORDER BY ar.joined_at DESC LIMIT ?");
-    $stmt->execute([$limit]);
+    $stmt = $pdo->prepare("SELECT ar.*, u.name as student_name, s.title as session_title, c.title as class_title, un.name as unit_name, p.name as program_name, d.name as department_name FROM attendance_records ar JOIN users u ON ar.user_id = u.id JOIN sessions s ON ar.session_id = s.id JOIN classes c ON s.class_id = c.id JOIN units un ON c.unit_id = un.id JOIN programs p ON un.program_id = p.id JOIN departments d ON p.department_id = d.id ORDER BY ar.joined_at DESC LIMIT " . (int)$limit);
+    $stmt->execute();
     return $stmt->fetchAll();
 }
 
@@ -1761,8 +1824,8 @@ function getAttendanceSummary($session_id) {
 // Assignment functions
 function getRecentAssignments($limit = 10) {
     global $pdo;
-    $stmt = $pdo->prepare("SELECT a.*, u.name as unit_name, p.name as program_name, d.name as department_name FROM assignments a JOIN units u ON a.unit_id = u.id JOIN programs p ON u.program_id = p.id JOIN departments d ON p.department_id = d.id WHERE a.status = 'active' ORDER BY a.due_date DESC LIMIT ?");
-    $stmt->execute([$limit]);
+    $stmt = $pdo->prepare("SELECT a.*, u.name as unit_name, p.name as program_name, d.name as department_name FROM assignments a JOIN units u ON a.unit_id = u.id JOIN programs p ON u.program_id = p.id JOIN departments d ON p.department_id = d.id WHERE a.status = 'active' ORDER BY a.due_date DESC LIMIT " . (int)$limit);
+    $stmt->execute();
     return $stmt->fetchAll();
 }
 

@@ -1211,4 +1211,642 @@ function getPurchaseById($id) {
     return $stmt->fetch();
 }
 
+function getDepartmentsByLevel($level) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT * FROM departments WHERE level = ? AND status = 'active' ORDER BY name ASC");
+    $stmt->execute([$level]);
+    return $stmt->fetchAll();
+}
+
+function getProgramsByTrainer($trainer_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT p.*, d.name as department_name FROM programs p JOIN departments d ON p.department_id = d.id JOIN courses c ON p.id = c.program_id WHERE c.trainer_id = ? AND p.status = 'active' GROUP BY p.id ORDER BY d.name, p.name ASC");
+    $stmt->execute([$trainer_id]);
+    return $stmt->fetchAll();
+}
+
+function getUnitsByTrainer($trainer_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT u.*, p.name as program_name, d.name as department_name FROM units u JOIN programs p ON u.program_id = p.id JOIN departments d ON p.department_id = d.id JOIN courses c ON u.id = c.unit_id WHERE c.trainer_id = ? AND u.status = 'active' ORDER BY u.year ASC, u.semester ASC, u.name ASC");
+    $stmt->execute([$trainer_id]);
+    return $stmt->fetchAll();
+}
+
+function getEbooksByUnit($unit_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT * FROM unit_materials WHERE unit_id = ? AND type = 'ebook' AND status = 'published' ORDER BY created_at DESC");
+    $stmt->execute([$unit_id]);
+    return $stmt->fetchAll();
+}
+
+// Live class functions
+function getClassesByTrainer($trainer_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT cl.*, c.name as course_name, u.name as unit_name, p.name as program_name FROM classes cl JOIN courses c ON cl.course_id = c.id JOIN units u ON c.unit_id = u.id JOIN programs p ON u.program_id = p.id WHERE c.trainer_id = ? ORDER BY cl.start_time ASC");
+    $stmt->execute([$trainer_id]);
+    return $stmt->fetchAll();
+}
+
+function startClass($id) {
+    global $pdo;
+    $stmt = $pdo->prepare("UPDATE classes SET status = 'in_progress' WHERE id = ?");
+    return $stmt->execute([$id]);
+}
+
+function endClass($id) {
+    global $pdo;
+    $stmt = $pdo->prepare("UPDATE classes SET status = 'completed' WHERE id = ?");
+    return $stmt->execute([$id]);
+}
+
+function getUpcomingClassesByTrainer($trainer_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT cl.*, c.name as course_name, u.name as unit_name, p.name as program_name FROM classes cl JOIN courses c ON cl.course_id = c.id JOIN units u ON c.unit_id = u.id JOIN programs p ON u.program_id = p.id WHERE c.trainer_id = ? AND cl.start_time > NOW() AND cl.status = 'scheduled' ORDER BY cl.start_time ASC");
+    $stmt->execute([$trainer_id]);
+    return $stmt->fetchAll();
+}
+
+function getPastClassesByTrainer($trainer_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT cl.*, c.name as course_name, u.name as unit_name, p.name as program_name FROM classes cl JOIN courses c ON cl.course_id = c.id JOIN units u ON c.unit_id = u.id JOIN programs p ON u.program_id = p.id WHERE c.trainer_id = ? AND (cl.end_time < NOW() OR cl.status = 'completed') ORDER BY cl.start_time DESC");
+    $stmt->execute([$trainer_id]);
+    return $stmt->fetchAll();
+}
+// Assignment functions
+function getAssignmentsByTrainer($trainer_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT a.*, c.name as course_name, u.name as unit_name, p.name as program_name FROM assignments a JOIN courses c ON a.course_id = c.id JOIN units u ON c.unit_id = u.id JOIN programs p ON u.program_id = p.id WHERE c.trainer_id = ? AND a.status = 'active' ORDER BY a.due_date ASC");
+    $stmt->execute([$trainer_id]);
+    return $stmt->fetchAll();
+}
+
+function updateAssignment($id, $title, $description, $due_date, $max_points, $file_path = null) {
+    global $pdo;
+    if ($file_path) {
+        $stmt = $pdo->prepare("UPDATE assignments SET title = ?, description = ?, due_date = ?, max_points = ?, file_path = ? WHERE id = ?");
+        return $stmt->execute([$title, $description, $due_date, $max_points, $file_path, $id]);
+    } else {
+        $stmt = $pdo->prepare("UPDATE assignments SET title = ?, description = ?, due_date = ?, max_points = ? WHERE id = ?");
+        return $stmt->execute([$title, $description, $due_date, $max_points, $id]);
+    }
+}
+
+function deleteAssignment($id) {
+    global $pdo;
+    $stmt = $pdo->prepare("UPDATE assignments SET status = 'inactive' WHERE id = ?");
+    return $stmt->execute([$id]);
+}
+
+function getActiveAssignmentsByTrainer($trainer_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT a.*, c.name as course_name, u.name as unit_name, p.name as program_name FROM assignments a JOIN courses c ON a.course_id = c.id JOIN units u ON c.unit_id = u.id JOIN programs p ON u.program_id = p.id WHERE c.trainer_id = ? AND a.status = 'active' AND a.due_date > NOW() ORDER BY a.due_date ASC");
+    $stmt->execute([$trainer_id]);
+    return $stmt->fetchAll();
+}
+
+function getPastAssignmentsByTrainer($trainer_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT a.*, c.name as course_name, u.name as unit_name, p.name as program_name FROM assignments a JOIN courses c ON a.course_id = c.id JOIN units u ON c.unit_id = u.id JOIN programs p ON u.program_id = p.id WHERE c.trainer_id = ? AND (a.status = 'inactive' OR a.due_date < NOW()) ORDER BY a.due_date DESC");
+    $stmt->execute([$trainer_id]);
+    return $stmt->fetchAll();
+}
+
+function getAssignmentSubmissions($assignment_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT asub.*, u.name as student_name FROM assignment_submissions asub JOIN users u ON asub.user_id = u.id WHERE asub.assignment_id = ? ORDER BY asub.submitted_at DESC");
+    $stmt->execute([$assignment_id]);
+    return $stmt->fetchAll();
+}
+
+
+
+function returnAssignmentSubmission($submission_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("UPDATE assignment_submissions SET status = 'returned', returned_at = NOW() WHERE id = ?");
+    return $stmt->execute([$submission_id]);
+}
+
+// Forum functions
+function getForumTopicsByTrainer($trainer_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT ft.*, u.name as author, c.name as course_name, p.name as program_name FROM forum_topics ft JOIN users u ON ft.user_id = u.id JOIN courses c ON ft.course_id = c.id JOIN units un ON c.unit_id = un.id JOIN programs p ON un.program_id = p.id WHERE c.trainer_id = ? ORDER BY ft.created_at DESC");
+    $stmt->execute([$trainer_id]);
+    return $stmt->fetchAll();
+}
+
+function getForumTopicsByCourse($course_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT ft.*, u.name as author FROM forum_topics ft JOIN users u ON ft.user_id = u.id WHERE ft.course_id = ? ORDER BY ft.created_at DESC");
+    $stmt->execute([$course_id]);
+    return $stmt->fetchAll();
+}
+
+function updateForumTopic($id, $title, $content, $category) {
+    global $pdo;
+    $stmt = $pdo->prepare("UPDATE forum_topics SET title = ?, content = ?, category = ? WHERE id = ?");
+    return $stmt->execute([$title, $content, $category, $id]);
+}
+
+function deleteForumTopic($id) {
+    global $pdo;
+    $stmt = $pdo->prepare("UPDATE forum_topics SET status = 'closed' WHERE id = ?");
+    return $stmt->execute([$id]);
+}
+
+function pinForumTopic($id) {
+    global $pdo;
+    $stmt = $pdo->prepare("UPDATE forum_topics SET status = 'pinned' WHERE id = ?");
+    return $stmt->execute([$id]);
+}
+
+function unpinForumTopic($id) {
+    global $pdo;
+    $stmt = $pdo->prepare("UPDATE forum_topics SET status = 'open' WHERE id = ?");
+    return $stmt->execute([$id]);
+}
+
+function closeForumTopic($id) {
+    global $pdo;
+    $stmt = $pdo->prepare("UPDATE forum_topics SET status = 'closed' WHERE id = ?");
+    return $stmt->execute([$id]);
+}
+
+function openForumTopic($id) {
+    global $pdo;
+    $stmt = $pdo->prepare("UPDATE forum_topics SET status = 'open' WHERE id = ?");
+    return $stmt->execute([$id]);
+}
+
+function getOpenForumTopicsByTrainer($trainer_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT ft.*, u.name as author, c.name as course_name, p.name as program_name FROM forum_topics ft JOIN users u ON ft.user_id = u.id JOIN courses c ON ft.course_id = c.id JOIN units un ON c.unit_id = un.id JOIN programs p ON un.program_id = p.id WHERE c.trainer_id = ? AND ft.status = 'open' ORDER BY ft.created_at DESC");
+    $stmt->execute([$trainer_id]);
+    return $stmt->fetchAll();
+}
+
+function getPinnedForumTopicsByTrainer($trainer_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT ft.*, u.name as author, c.name as course_name, p.name as program_name FROM forum_topics ft JOIN users u ON ft.user_id = u.id JOIN courses c ON ft.course_id = c.id JOIN units un ON c.unit_id = un.id JOIN programs p ON un.program_id = p.id WHERE c.trainer_id = ? AND ft.status = 'pinned' ORDER BY ft.created_at DESC");
+    $stmt->execute([$trainer_id]);
+    return $stmt->fetchAll();
+}
+
+function getClosedForumTopicsByTrainer($trainer_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT ft.*, u.name as author, c.name as course_name, p.name as program_name FROM forum_topics ft JOIN users u ON ft.user_id = u.id JOIN courses c ON ft.course_id = c.id JOIN units un ON c.unit_id = un.id JOIN programs p ON un.program_id = p.id WHERE c.trainer_id = ? AND ft.status = 'closed' ORDER BY ft.created_at DESC");
+    $stmt->execute([$trainer_id]);
+    return $stmt->fetchAll();
+}
+
+// Helper functions
+function formatDate($date) {
+    return date('M j, Y g:i A', strtotime($date));
+}
+
+function formatShortDate($date) {
+    return date('M j, Y', strtotime($date));
+}
+
+function formatTime($time) {
+    return date('g:i A', strtotime($time));
+}
+
+function timeAgo($timestamp) {
+    $diff = time() - strtotime($timestamp);
+    if ($diff < 60) {
+        return $diff . ' seconds ago';
+    } elseif ($diff < 3600) {
+        return floor($diff / 60) . ' minutes ago';
+    } elseif ($diff < 86400) {
+        return floor($diff / 3600) . ' hours ago';
+    } else {
+        return floor($diff / 86400) . ' days ago';
+    }
+}
+
+function getFileIcon($type) {
+    switch($type) {
+        case 'lecture_note': return '📝';
+        case 'assignment': return '📋';
+        case 'video': return '🎬';
+        case 'ebook': return '📖';
+        default: return '📁';
+    }
+}
+
+function getStatusBadge($status) {
+    switch($status) {
+        case 'active': return '<span class="badge badge-success">Active</span>';
+        case 'inactive': return '<span class="badge badge-danger">Inactive</span>';
+        case 'pending': return '<span class="badge badge-warning">Pending</span>';
+        case 'suspended': return '<span class="badge badge-danger">Suspended</span>';
+        case 'published': return '<span class="badge badge-success">Published</span>';
+        case 'draft': return '<span class="badge badge-warning">Draft</span>';
+        case 'archived': return '<span class="badge badge-secondary">Archived</span>';
+        case 'open': return '<span class="badge badge-success">Open</span>';
+        case 'closed': return '<span class="badge badge-danger">Closed</span>';
+        case 'pinned': return '<span class="badge badge-warning">Pinned</span>';
+        case 'scheduled': return '<span class="badge badge-info">Scheduled</span>';
+        case 'in_progress': return '<span class="badge badge-warning">In Progress</span>';
+        case 'completed': return '<span class="badge badge-success">Completed</span>';
+        case 'cancelled': return '<span class="badge badge-danger">Cancelled</span>';
+        case 'submitted': return '<span class="badge badge-info">Submitted</span>';
+        case 'graded': return '<span class="badge badge-success">Graded</span>';
+        case 'returned': return '<span class="badge badge-secondary">Returned</span>';
+        default: return '<span class="badge badge-secondary">' . ucfirst($status) . '</span>';
+    }
+}
+// Student functions
+function getStudents() {
+    global $pdo;
+    $stmt = $pdo->query("SELECT * FROM users WHERE role = 'trainee' AND status = 'active' ORDER BY name ASC");
+    return $stmt->fetchAll();
+}
+
+function getAllStudents() {
+    global $pdo;
+    $stmt = $pdo->query("SELECT * FROM users WHERE role = 'trainee' ORDER BY name ASC");
+    return $stmt->fetchAll();
+}
+
+function getStudentById($id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ? AND role = 'trainee'");
+    $stmt->execute([$id]);
+    return $stmt->fetch();
+}
+
+function getStudentEnrollments($student_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT e.*, p.name as program_name, d.name as department_name FROM enrollments e JOIN programs p ON e.program_id = p.id JOIN departments d ON p.department_id = d.id WHERE e.user_id = ? AND e.status = 'active'");
+    $stmt->execute([$student_id]);
+    return $stmt->fetchAll();
+}
+
+function getStudentRegisteredUnits($student_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT ur.*, u.name as unit_name, u.code as unit_code, p.name as program_name, d.name as department_name FROM unit_registrations ur JOIN units u ON ur.unit_id = u.id JOIN programs p ON u.program_id = p.id JOIN departments d ON p.department_id = d.id JOIN enrollments e ON ur.enrollment_id = e.id WHERE e.user_id = ? AND ur.status = 'registered'");
+    $stmt->execute([$student_id]);
+    return $stmt->fetchAll();
+}
+
+// Enrollment functions
+function getAllEnrollments() {
+    global $pdo;
+    $stmt = $pdo->query("SELECT e.*, u.name as student_name, p.name as program_name, d.name as department_name FROM enrollments e JOIN users u ON e.user_id = u.id JOIN programs p ON e.program_id = p.id JOIN departments d ON p.department_id = d.id WHERE e.status = 'active' ORDER BY e.enrollment_date DESC");
+    return $stmt->fetchAll();
+}
+
+function createEnrollment($user_id, $program_id) {
+    global $pdo;
+    $enrollment_date = date('Y-m-d');
+    $stmt = $pdo->prepare("INSERT INTO enrollments (user_id, program_id, enrollment_date, status) VALUES (?, ?, ?, 'active')");
+    return $stmt->execute([$user_id, $program_id, $enrollment_date]);
+}
+
+function updateEnrollment($id, $status) {
+    global $pdo;
+    $stmt = $pdo->prepare("UPDATE enrollments SET status = ? WHERE id = ?");
+    return $stmt->execute([$status, $id]);
+}
+
+function deleteEnrollment($id) {
+    global $pdo;
+    $stmt = $pdo->prepare("DELETE FROM enrollments WHERE id = ?");
+    return $stmt->execute([$id]);
+}
+
+// Unit registration functions
+function getAllRegisteredUnits() {
+    global $pdo;
+    $stmt = $pdo->query("SELECT ur.*, u.name as unit_name, u.code as unit_code, p.name as program_name, d.name as department_name, usr.name as student_name FROM unit_registrations ur JOIN units u ON ur.unit_id = u.id JOIN programs p ON u.program_id = p.id JOIN departments d ON p.department_id = d.id JOIN enrollments e ON ur.enrollment_id = e.id JOIN users usr ON e.user_id = usr.id WHERE ur.status = 'registered' ORDER BY ur.registration_date DESC");
+    return $stmt->fetchAll();
+}
+
+function unregisterUnit($id) {
+    global $pdo;
+    $stmt = $pdo->prepare("UPDATE unit_registrations SET status = 'dropped' WHERE id = ?");
+    return $stmt->execute([$id]);
+}
+
+// Exam functions
+function createExam($unit_id, $title, $description, $exam_date, $start_time, $end_time, $max_points, $exam_type) {
+    global $pdo;
+    $stmt = $pdo->prepare("INSERT INTO exams (unit_id, title, description, exam_date, start_time, end_time, max_points, exam_type, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')");
+    return $stmt->execute([$unit_id, $title, $description, $exam_date, $start_time, $end_time, $max_points, $exam_type]);
+}
+
+function updateExam($id, $title, $description, $exam_date, $start_time, $end_time, $max_points, $exam_type) {
+    global $pdo;
+    $stmt = $pdo->prepare("UPDATE exams SET title = ?, description = ?, exam_date = ?, start_time = ?, end_time = ?, max_points = ?, exam_type = ? WHERE id = ?");
+    return $stmt->execute([$title, $description, $exam_date, $start_time, $end_time, $max_points, $exam_type, $id]);
+}
+
+function deleteExam($id) {
+    global $pdo;
+    $stmt = $pdo->prepare("UPDATE exams SET status = 'cancelled' WHERE id = ?");
+    return $stmt->execute([$id]);
+}
+
+function getAllExams() {
+    global $pdo;
+    $stmt = $pdo->query("SELECT e.*, u.name as unit_name, p.name as program_name, d.name as department_name FROM exams e JOIN units u ON e.unit_id = u.id JOIN programs p ON u.program_id = p.id JOIN departments d ON p.department_id = d.id WHERE e.status != 'cancelled' ORDER BY e.exam_date DESC, e.start_time DESC");
+    return $stmt->fetchAll();
+}
+
+function getExamsByUnit($unit_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT * FROM exams WHERE unit_id = ? AND status != 'cancelled' ORDER BY exam_date DESC, start_time DESC");
+    $stmt->execute([$unit_id]);
+    return $stmt->fetchAll();
+}
+
+function getExamById($id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT e.*, u.name as unit_name, p.name as program_name, d.name as department_name FROM exams e JOIN units u ON e.unit_id = u.id JOIN programs p ON u.program_id = p.id JOIN departments d ON p.department_id = d.id WHERE e.id = ?");
+    $stmt->execute([$id]);
+    return $stmt->fetch();
+}
+
+function getExamsWithResults() {
+    global $pdo;
+    $stmt = $pdo->query("SELECT e.*, u.name as unit_name, p.name as program_name, d.name as department_name, COUNT(er.id) as results_count FROM exams e JOIN units u ON e.unit_id = u.id JOIN programs p ON u.program_id = p.id JOIN departments d ON p.department_id = d.id LEFT JOIN exam_results er ON e.id = er.exam_id WHERE e.status != 'cancelled' GROUP BY e.id ORDER BY e.exam_date DESC, e.start_time DESC");
+    return $stmt->fetchAll();
+}
+
+function getRecentExams($limit = 10) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT e.*, u.name as unit_name, p.name as program_name, d.name as department_name FROM exams e JOIN units u ON e.unit_id = u.id JOIN programs p ON u.program_id = p.id JOIN departments d ON p.department_id = d.id WHERE e.status != 'cancelled' ORDER BY e.exam_date DESC, e.start_time DESC LIMIT ?");
+    $stmt->execute([$limit]);
+    return $stmt->fetchAll();
+}
+
+// Exam result functions
+function recordExamResult($exam_id, $student_id, $points_awarded) {
+    global $pdo;
+    // Check if result already exists
+    $stmt = $pdo->prepare("SELECT id FROM exam_results WHERE exam_id = ? AND student_id = ?");
+    $stmt->execute([$exam_id, $student_id]);
+    $existing = $stmt->fetch();
+    
+    if ($existing) {
+        // Update existing result
+        $stmt = $pdo->prepare("UPDATE exam_results SET points_awarded = ?, graded_at = NOW() WHERE id = ?");
+        return $stmt->execute([$points_awarded, $existing['id']]);
+    } else {
+        // Create new result
+        $stmt = $pdo->prepare("INSERT INTO exam_results (exam_id, student_id, points_awarded, graded_at) VALUES (?, ?, ?, NOW())");
+        return $stmt->execute([$exam_id, $student_id, $points_awarded]);
+    }
+}
+
+function getExamResults($exam_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT er.*, u.name as student_name, e.max_points FROM exam_results er JOIN users u ON er.student_id = u.id JOIN exams e ON er.exam_id = e.id WHERE er.exam_id = ? ORDER BY er.points_awarded DESC");
+    $stmt->execute([$exam_id]);
+    return $stmt->fetchAll();
+}
+
+function getStudentExamResults($student_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT er.*, e.title as exam_title, u.name as unit_name, p.name as program_name, d.name as department_name, e.max_points FROM exam_results er JOIN exams e ON er.exam_id = e.id JOIN units u ON e.unit_id = u.id JOIN programs p ON u.program_id = p.id JOIN departments d ON p.department_id = d.id WHERE er.student_id = ? ORDER BY er.graded_at DESC");
+    $stmt->execute([$student_id]);
+    return $stmt->fetchAll();
+}
+
+function exportResultsToCSV($exam_id) {
+    global $pdo;
+    
+    // Get exam details
+    $exam = getExamById($exam_id);
+    if (!$exam) {
+        return false;
+    }
+    
+    // Get results
+    $results = getExamResults($exam_id);
+    
+    // Set headers for CSV download
+    header('Content-Type: text/csv');
+    header('Content-Disposition: attachment; filename="exam_results_' . $exam['title'] . '_' . date('Y-m-d') . '.csv"');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+    
+    // Output CSV
+    $output = fopen('php://output', 'w');
+    
+    // Add CSV headers
+    fputcsv($output, ['Student ID', 'Student Name', 'Points Awarded', 'Max Points', 'Percentage', 'Grade']);
+    
+    // Add data rows
+    foreach ($results as $result) {
+        $percentage = ($result['points_awarded'] / $exam['max_points']) * 100;
+        
+        // Determine grade
+        if ($percentage >= 85) {
+            $grade = 'A';
+        } elseif ($percentage >= 75) {
+            $grade = 'B+';
+        } elseif ($percentage >= 65) {
+            $grade = 'B';
+        } elseif ($percentage >= 55) {
+            $grade = 'C+';
+        } elseif ($percentage >= 45) {
+            $grade = 'C';
+        } elseif ($percentage >= 35) {
+            $grade = 'D';
+        } else {
+            $grade = 'F';
+        }
+        
+        fputcsv($output, [
+            $result['student_id'],
+            $result['student_name'],
+            $result['points_awarded'],
+            $exam['max_points'],
+            round($percentage, 2) . '%',
+            $grade
+        ]);
+    }
+    
+    fclose($output);
+    exit();
+}
+
+function getRecentResults($limit = 10) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT er.*, u.name as student_name, e.title as exam_title, un.name as unit_name, p.name as program_name, d.name as department_name FROM exam_results er JOIN users u ON er.student_id = u.id JOIN exams e ON er.exam_id = e.id JOIN units un ON e.unit_id = un.id JOIN programs p ON un.program_id = p.id JOIN departments d ON p.department_id = d.id ORDER BY er.graded_at DESC LIMIT ?");
+    $stmt->execute([$limit]);
+    return $stmt->fetchAll();
+}
+
+// Attendance functions
+function getAttendanceRecordsBySession($session_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT ar.*, u.name as student_name FROM attendance_records ar JOIN users u ON ar.user_id = u.id WHERE ar.session_id = ? ORDER BY ar.joined_at DESC");
+    $stmt->execute([$session_id]);
+    return $stmt->fetchAll();
+}
+
+function getAllSessions() {
+    global $pdo;
+    $stmt = $pdo->query("SELECT s.*, c.title as class_title, u.name as unit_name, p.name as program_name, d.name as department_name FROM sessions s JOIN classes c ON s.class_id = c.id JOIN units u ON c.unit_id = u.id JOIN programs p ON u.program_id = p.id JOIN departments d ON p.department_id = d.id ORDER BY s.start_time DESC");
+    return $stmt->fetchAll();
+}
+
+function getRecentAttendanceRecords($limit = 10) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT ar.*, u.name as student_name, s.title as session_title, c.title as class_title, un.name as unit_name, p.name as program_name, d.name as department_name FROM attendance_records ar JOIN users u ON ar.user_id = u.id JOIN sessions s ON ar.session_id = s.id JOIN classes c ON s.class_id = c.id JOIN units un ON c.unit_id = un.id JOIN programs p ON un.program_id = p.id JOIN departments d ON p.department_id = d.id ORDER BY ar.joined_at DESC LIMIT ?");
+    $stmt->execute([$limit]);
+    return $stmt->fetchAll();
+}
+
+function updateAttendanceStatus($record_id, $status) {
+    global $pdo;
+    $stmt = $pdo->prepare("UPDATE attendance_records SET status = ? WHERE id = ?");
+    return $stmt->execute([$status, $record_id]);
+}
+
+function exportAttendanceToCSV($session_id) {
+    global $pdo;
+    
+    // Get session details
+    $session = getSessionById($session_id);
+    if (!$session) {
+        return false;
+    }
+    
+    // Get attendance records
+    $records = getAttendanceRecordsBySession($session_id);
+    
+    // Set headers for CSV download
+    header('Content-Type: text/csv');
+    header('Content-Disposition: attachment; filename="attendance_' . $session['title'] . '_' . date('Y-m-d') . '.csv"');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+    
+    // Output CSV
+    $output = fopen('php://output', 'w');
+    
+    // Add CSV headers
+    fputcsv($output, ['Student ID', 'Student Name', 'Joined At', 'Left At', 'Status']);
+    
+    // Add data rows
+    foreach ($records as $record) {
+        fputcsv($output, [
+            $record['user_id'],
+            $record['student_name'],
+            $record['joined_at'] ? date('Y-m-d H:i:s', strtotime($record['joined_at'])) : 'N/A',
+            $record['left_at'] ? date('Y-m-d H:i:s', strtotime($record['left_at'])) : 'N/A',
+            ucfirst($record['status'])
+        ]);
+    }
+    
+    fclose($output);
+    exit();
+}
+
+function getAttendanceSummary($session_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present,
+        SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent,
+        SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late
+        FROM attendance_records WHERE session_id = ?");
+    $stmt->execute([$session_id]);
+    return $stmt->fetch();
+}
+
+// Assignment functions
+function getRecentAssignments($limit = 10) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT a.*, u.name as unit_name, p.name as program_name, d.name as department_name FROM assignments a JOIN units u ON a.unit_id = u.id JOIN programs p ON u.program_id = p.id JOIN departments d ON p.department_id = d.id WHERE a.status = 'active' ORDER BY a.due_date DESC LIMIT ?");
+    $stmt->execute([$limit]);
+    return $stmt->fetchAll();
+}
+
+// Unit functions
+function getAllUnits() {
+    global $pdo;
+    $stmt = $pdo->query("SELECT u.*, p.name as program_name, d.name as department_name FROM units u JOIN programs p ON u.program_id = p.id JOIN departments d ON p.department_id = d.id WHERE u.status = 'active' ORDER BY d.name, p.name, u.year, u.semester, u.name");
+    return $stmt->fetchAll();
+}
+
+// Forum functions
+function getRecentForumTopics($limit = 10) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT ft.*, u.name as author, un.name as unit_name, p.name as program_name, d.name as department_name FROM forum_topics ft JOIN users u ON ft.user_id = u.id JOIN units un ON ft.unit_id = un.id JOIN programs p ON un.program_id = p.id JOIN departments d ON p.department_id = d.id ORDER BY ft.created_at DESC LIMIT ?");
+    $stmt->execute([$limit]);
+    return $stmt->fetchAll();
+}
+
+function getForumReplies($topic_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT fr.*, u.name as author FROM forum_replies fr JOIN users u ON fr.user_id = u.id WHERE fr.topic_id = ? ORDER BY fr.created_at ASC");
+    $stmt->execute([$topic_id]);
+    return $stmt->fetchAll();
+}
+
+function updateForumReply($id, $content) {
+    global $pdo;
+    $stmt = $pdo->prepare("UPDATE forum_replies SET content = ?, updated_at = NOW() WHERE id = ?");
+    return $stmt->execute([$content, $id]);
+}
+
+function deleteForumReply($id) {
+    global $pdo;
+    $stmt = $pdo->prepare("DELETE FROM forum_replies WHERE id = ?");
+    return $stmt->execute([$id]);
+}
+
+function getCertificatesByUser($user_id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT c.*, p.name as program_name FROM certificates c JOIN programs p ON c.program_id = p.id WHERE c.user_id = ? AND c.status = 'active' ORDER BY c.issued_date DESC");
+    $stmt->execute([$user_id]);
+    return $stmt->fetchAll();
+}
+
+function getCertificateById($id) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT c.*, p.name as program_name, u.name as user_name FROM certificates c JOIN programs p ON c.program_id = p.id JOIN users u ON c.user_id = u.id WHERE c.id = ?");
+    $stmt->execute([$id]);
+    return $stmt->fetch();
+}
+
+function updateEnrollmentStatus($enrollment_id, $status) {
+    global $pdo;
+    
+    // Validate status
+    $validStatuses = ['active', 'completed', 'dropped', 'suspended'];
+    if (!in_array($status, $validStatuses)) {
+        return false;
+    }
+    
+    try {
+        $stmt = $pdo->prepare("UPDATE enrollments SET status = ?, updated_at = NOW() WHERE id = ?");
+        $result = $stmt->execute([$status, $enrollment_id]);
+        
+        if ($result) {
+            // If enrollment is completed, update related unit registrations
+            if ($status === 'completed') {
+                $stmt = $pdo->prepare("UPDATE unit_registrations SET status = 'completed' WHERE enrollment_id = ?");
+                $stmt->execute([$enrollment_id]);
+            }
+            
+            // If enrollment is dropped, update related unit registrations
+            if ($status === 'dropped') {
+                $stmt = $pdo->prepare("UPDATE unit_registrations SET status = 'dropped' WHERE enrollment_id = ?");
+                $stmt->execute([$enrollment_id]);
+            }
+            
+            return true;
+        }
+        return false;
+    } catch (PDOException $e) {
+        // Log error for debugging
+        error_log("Failed to update enrollment status: " . $e->getMessage());
+        return false;
+    }
+}
 ?>

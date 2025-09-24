@@ -25,7 +25,11 @@ foreach ($departments as $department) {
 // Handle course creation
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['create_course'])) {
-        $unit_id = $_POST['unit_id'];
+       $unit_id = $_POST['unit_id'] ?? null;
+if (!$unit_id) {
+    $error = "Please select a unit before creating a course.";
+}
+
         $name = $_POST['name'];
         $code = $_POST['code'];
         $description = $_POST['description'];

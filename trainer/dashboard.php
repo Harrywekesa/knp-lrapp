@@ -82,7 +82,6 @@ $forumTopics = array_slice($forumTopics, 0, 5);
                     <li><a href="live_classes.php">Live Classes</a></li>
                     <li><a href="assignments.php">Assignments</a></li>
                     <li><a href="forum.php">Discussion Forum</a></li>
-                    <li><a href="ai_assistant.php">Your AI Assistant</a></li>
                     <li><a href="profile.php">Profile</a></li>
                     <li><a href="../logout.php">Logout</a></li>
                 </ul>
@@ -119,11 +118,6 @@ $forumTopics = array_slice($forumTopics, 0, 5);
                         <div class="stat-number"><?php echo count($forumTopics); ?></div>
                         <div class="stat-label">Forum Topics</div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">🤖</div>
-                        <div class="stat-number">AI</div>
-                        <div class="stat-label">Assistant</div>
-                    </div>
                 </div>
             </div>
             
@@ -142,15 +136,20 @@ $forumTopics = array_slice($forumTopics, 0, 5);
                     <div class="grid">
                         <?php foreach (array_slice($courses, 0, 3) as $course): ?>
                         <div class="course-card">
-                            <div style="background: #ddd; height: 150px; display: flex; align-items: center; justify-content: center; border-radius: 4px 4px 0 0;">
-                                <?php echo htmlspecialchars($course['code'] ?? 'COURSE'); ?>
+                            <div style="background: var(--primary-color); color: white; padding: 1rem; border-radius: 4px 4px 0 0;">
+                                <h3 style="margin: 0;"><?php echo htmlspecialchars($course['name']); ?></h3>
+                                <p style="margin: 0.5rem 0 0; opacity: 0.9;">
+                                    <?php echo htmlspecialchars($course['code']); ?>
+                                </p>
                             </div>
                             <div class="course-card-content">
-                                <h3><?php echo htmlspecialchars($course['name']); ?></h3>
                                 <p><?php echo htmlspecialchars(substr($course['description'] ?? 'No description available', 0, 100)) . '...'; ?></p>
                                 <div style="display: flex; justify-content: space-between; margin-top: 1rem;">
-                                    <span><?php echo $course['duration']; ?> years</span>
-                                    <a href="course.php?id=<?php echo $course['id']; ?>" class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">View Details</a>
+                                    <span>Y<?php echo $course['year']; ?>/S<?php echo $course['semester']; ?></span>
+                                    <span><?php echo $course['credits']; ?> credits</span>
+                                </div>
+                                <div style="margin-top: 1rem;">
+                                    <a href="course.php?id=<?php echo $course['id']; ?>" class="btn btn-block">View Course Details</a>
                                 </div>
                             </div>
                         </div>
@@ -191,7 +190,9 @@ $forumTopics = array_slice($forumTopics, 0, 5);
                                     <?php echo date('g:i A', strtotime($class['end_time'])); ?>
                                 </p>
                                 <div style="margin-top: 0.5rem;">
-                                    <a href="live_class.php?id=<?php echo $class['id']; ?>" class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">Manage Class</a>
+                                    <a href="live_class.php?id=<?php echo $class['id']; ?>" class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+                                        <?php echo (strtotime($class['start_time']) > time()) ? 'Manage Class' : 'View Details'; ?>
+                                    </a>
                                 </div>
                             </div>
                             <?php endforeach; ?>
@@ -234,10 +235,7 @@ $forumTopics = array_slice($forumTopics, 0, 5);
                                     </span>
                                 </div>
                                 <p style="margin: 0.25rem 0 0; color: #666; font-size: 0.9rem;">
-                                    <?php 
-                                    $course = getProgramById($assignment['program_id']);
-                                    echo htmlspecialchars($course['name'] ?? 'N/A');
-                                    ?>
+                                    <?php echo htmlspecialchars($assignment['course_name'] ?? 'N/A'); ?>
                                 </p>
                                 <p style="margin: 0.25rem 0 0; color: #666; font-size: 0.85rem;">
                                     Max Points: <?php echo $assignment['max_points']; ?>
@@ -250,64 +248,51 @@ $forumTopics = array_slice($forumTopics, 0, 5);
                         </div>
                     <?php endif; ?>
                 </div>
-            </div>
-            
-            <div class="card">
-                <div class="card-header">
-                    <h2>Discussion Forum Topics</h2>
-                    <p>Recent discussions in your courses</p>
-                </div>
                 
-                <?php if (empty($forumTopics)): ?>
-                    <div class="alert">No forum topics yet.</div>
-                <?php else: ?>
-                    <div style="max-height: 300px; overflow-y: auto;">
-                        <?php foreach ($forumTopics as $topic): ?>
-                        <div class="forum-topic" style="padding: 1rem; border-bottom: 1px solid #eee;">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <h4 style="margin: 0; font-size: 1rem;">
-                                    <a href="forum_topic.php?id=<?php echo $topic['id']; ?>" style="color: var(--primary-color); text-decoration: none;">
-                                        <?php echo htmlspecialchars($topic['title']); ?>
-                                    </a>
-                                </h4>
-                                <span style="color: #666; font-size: 0.85rem;">
-                                    <?php echo date('M j, g:i A', strtotime($topic['created_at'])); ?>
-                                </span>
-                            </div>
-                            <p style="margin: 0.25rem 0 0; color: #666; font-size: 0.9rem;">
-                                <?php echo htmlspecialchars($topic['course_name']); ?>
-                            </p>
-                            <p style="margin: 0.25rem 0 0; color: #666; font-size: 0.85rem;">
-                                By <?php echo htmlspecialchars($topic['author']); ?>
-                            </p>
-                            <div style="margin-top: 0.5rem;">
-                                <a href="forum_topic.php?id=<?php echo $topic['id']; ?>" class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">View Discussion</a>
-                            </div>
-                        </div>
-                        <?php endforeach; ?>
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Discussion Forum</h2>
+                        <p>Recent forum topics in your courses</p>
                     </div>
-                <?php endif; ?>
+                    
+                    <?php if (empty($forumTopics)): ?>
+                        <div class="alert">No forum topics found.</div>
+                    <?php else: ?>
+                        <div style="max-height: 300px; overflow-y: auto;">
+                            <?php foreach ($forumTopics as $topic): ?>
+                            <div class="forum-topic" style="padding: 1rem; border-bottom: 1px solid #eee;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <h4 style="margin: 0; font-size: 1rem;">
+                                        <a href="forum_topic.php?id=<?php echo $topic['id']; ?>" style="color: var(--primary-color); text-decoration: none; font-weight: 500;">
+                                            <?php echo htmlspecialchars($topic['title']); ?>
+                                        </a>
+                                    </h4>
+                                    <span style="color: #666; font-size: 0.85rem;">
+                                        <?php echo date('M j, g:i A', strtotime($topic['created_at'])); ?>
+                                    </span>
+                                </div>
+                                <p style="margin: 0.25rem 0 0; color: #666; font-size: 0.9rem;">
+                                    <?php echo htmlspecialchars($topic['course_name'] ?? 'N/A'); ?>
+                                </p>
+                                <p style="margin: 0.25rem 0 0; color: #666; font-size: 0.85rem;">
+                                    By <?php echo htmlspecialchars($topic['author']); ?>
+                                </p>
+                                <div style="margin-top: 0.5rem;">
+                                    <?php if ($topic['status'] === 'open'): ?>
+                                        <span class="badge badge-success">Open</span>
+                                    <?php elseif ($topic['status'] === 'closed'): ?>
+                                        <span class="badge badge-danger">Closed</span>
+                                    <?php elseif ($topic['status'] === 'pinned'): ?>
+                                        <span class="badge badge-warning">Pinned</span>
+                                    <?php endif; ?>
+                                    <a href="forum_topic.php?id=<?php echo $topic['id']; ?>" class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; margin-left: 0.5rem;">View Discussion</a>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
             </div>
-            <div class="card">
-            <div class="card-header">
-                <h2>AI Assistant</h2>
-                <p>Get intelligent help with your studies</p>
-            </div>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-                <a href="ai_assistant.php" class="btn" style="text-align: center; padding: 1.5rem;">
-                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">🤖</div>
-                    <div>Ask AI Assistant</div>
-                </a>
-                <a href="ai_assistant.php?action=generate_quiz" class="btn" style="text-align: center; padding: 1.5rem;">
-                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">📝</div>
-                    <div>Generate Quiz</div>
-                </a>
-                <a href="ai_assistant.php?action=summarize_notes" class="btn" style="text-align: center; padding: 1.5rem;">
-                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">📚</div>
-                    <div>Summarize Notes</div>
-                </a>
-            </div>
-        </div>
         </div>
     </main>
 
@@ -339,7 +324,28 @@ $forumTopics = array_slice($forumTopics, 0, 5);
             border-bottom: 2px solid white;
         }
         
-        .forum-topic:hover, .class-item:hover, .assignment-item:hover {
+        .course-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+            transition: transform 0.3s;
+        }
+        
+        .course-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .course-card-content {
+            padding: 1rem;
+        }
+        
+        .course-card-content h3 {
+            margin-bottom: 0.5rem;
+            color: var(--primary-color);
+        }
+        
+        .class-item:hover, .assignment-item:hover, .forum-topic:hover {
             background-color: #f8fafc;
         }
     </style>

@@ -12,19 +12,32 @@ $courses = getCoursesByTrainer($user['id']);
 // Get all programs for reference
 $programs = getAllPrograms();
 
-// Get ebooks created by this trainer
+// Group courses by program for better organization
+$programCourses = [];
+foreach ($courses as $course) {
+    $programId = $course['program_id'];
+    if (!isset($programCourses[$programId])) {
+        $programCourses[$programId] = [
+            'program' => getProgramById($programId),
+            'courses' => []
+        ];
+    }
+    $programCourses[$programId]['courses'][] = $course;
+}
+
+// Get all e-books for trainer's courses
 $ebooks = getEbooksByTrainer($user['id']);
 
-// Handle ebook actions
+// Handle e-book creation
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['create_ebook'])) {
+        $unit_id = $_POST['unit_id'];
         $title = $_POST['title'];
         $author = $_POST['author'];
         $description = $_POST['description'];
         $price = $_POST['price'];
         $pages = $_POST['pages'];
         $preview_pages = $_POST['preview_pages'];
-        $unit_id = $_POST['unit_id'];
         $access_level = $_POST['access_level'];
         
         // Handle file uploads
@@ -61,25 +74,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         
-        if (createEbook($title, $author, $description, $price, $pages, $preview_pages, $unit_id, $access_level, $file_path, $cover_image)) {
+        if (createEbook($unit_id, $title, $author, $description, $price, $pages, $preview_pages, $access_level, $file_path, $cover_image)) {
             $success = "E-book created successfully";
-            // Refresh ebooks
+            // Refresh e-books
             $ebooks = getEbooksByTrainer($user['id']);
         } else {
             $error = "Failed to create e-book";
         }
     } elseif (isset($_POST['update_ebook'])) {
         $id = $_POST['ebook_id'];
+        $unit_id = $_POST['unit_id'];
         $title = $_POST['title'];
         $author = $_POST['author'];
         $description = $_POST['description'];
         $price = $_POST['price'];
         $pages = $_POST['pages'];
         $preview_pages = $_POST['preview_pages'];
-        $unit_id = $_POST['unit_id'];
         $access_level = $_POST['access_level'];
         
-        // Handle file uploads
+        // Handle cover image upload
         $cover_image = null;
         if (isset($_FILES['cover_image']) && $_FILES['cover_image']['error'] === UPLOAD_ERR_OK) {
             $upload_dir = '../uploads/covers/';
@@ -98,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if (updateEbook($id, $title, $author, $description, $price, $pages, $preview_pages, $unit_id, $access_level, $cover_image)) {
             $success = "E-book updated successfully";
-            // Refresh ebooks
+            // Refresh e-books
             $ebooks = getEbooksByTrainer($user['id']);
         } else {
             $error = "Failed to update e-book";
@@ -108,7 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if (deleteEbook($id)) {
             $success = "E-book deleted successfully";
-            // Refresh ebooks
+            // Refresh e-books
             $ebooks = getEbooksByTrainer($user['id']);
         } else {
             $error = "Failed to delete e-book";
@@ -116,18 +129,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Group courses by program
-$programCourses = [];
-foreach ($courses as $course) {
-    $programId = $course['program_id'];
-    if (!isset($programCourses[$programId])) {
-        $programCourses[$programId] = [
-            'program' => getProgramById($programId),
-            'courses' => []
-        ];
-    }
-    $programCourses[$programId]['courses'][] = $course;
-}
+// Level display names
+$levelNames = [
+    'certificate' => 'Certificate Programs',
+    'diploma' => 'Diploma Programs',
+    'degree' => 'Degree Programs',
+    'masters' => 'Masters Programs',
+    'phd' => 'PhD Programs'
+];
 ?>
 
 <!DOCTYPE html>
@@ -157,7 +166,6 @@ foreach ($courses as $course) {
                     <li><a href="live_classes.php">Live Classes</a></li>
                     <li><a href="assignments.php">Assignments</a></li>
                     <li><a href="forum.php">Discussion Forum</a></li>
-                    <li><a href="ai_assistant.php">Your AI Assistant</a></li>
                     <li><a href="profile.php">Profile</a></li>
                     <li><a href="../logout.php">Logout</a></li>
                 </ul>
@@ -170,7 +178,7 @@ foreach ($courses as $course) {
             <div class="card">
                 <div class="card-header">
                     <h2>E-Books Management</h2>
-                    <p>Create and manage e-books for your courses</p>
+                    <p>Upload and manage e-books for your courses</p>
                 </div>
                 
                 <?php if (isset($success)): ?>
@@ -192,7 +200,7 @@ foreach ($courses as $course) {
                             <label for="unit_id">Unit *</label>
                             <select id="unit_id" name="unit_id" class="form-control" required>
                                 <option value="">Select a unit</option>
-                                <?php foreach ($programCourses as $programData): ?>
+                                <?php foreach ($programCourses as $programId => $programData): ?>
                                     <?php if (!empty($programData['courses'])): ?>
                                         <optgroup label="<?php echo htmlspecialchars($programData['program']['name'] ?? 'N/A'); ?> (<?php echo htmlspecialchars($programData['program']['department_name'] ?? 'N/A'); ?>)">
                                             <?php foreach ($programData['courses'] as $course): ?>
@@ -297,15 +305,18 @@ foreach ($courses as $course) {
                 
                 <?php if (empty($ebooks)): ?>
                     <div class="alert">You haven't uploaded any e-books yet.</div>
+                    <div style="text-align: center; margin: 2rem 0;">
+                        <button id="show-create-form" class="btn">Upload Your First E-Book</button>
+                    </div>
                 <?php else: ?>
                     <div class="grid">
                         <?php foreach ($ebooks as $ebook): ?>
                         <div class="ebook-card">
                             <div style="position: relative;">
                                 <?php if ($ebook['cover_image']): ?>
-                                    <img src="../<?php echo htmlspecialchars($ebook['cover_image']); ?>" alt="Cover" style="width: 100%; height: 150px; object-fit: cover;">
+                                    <img src="../<?php echo htmlspecialchars($ebook['cover_image']); ?>" alt="Cover" style="width: 100%; height: 150px; object-fit: cover; border-radius: 4px 4px 0 0;">
                                 <?php else: ?>
-                                    <div style="background: #ddd; height: 150px; display: flex; align-items: center; justify-content: center;">
+                                    <div style="background: #ddd; height: 150px; display: flex; align-items: center; justify-content: center; border-radius: 4px 4px 0 0;">
                                         <?php 
                                         switch($ebook['type']) {
                                             case 'lecture_note': echo '📝'; break;
@@ -340,28 +351,28 @@ foreach ($courses as $course) {
                                     }
                                     ?>
                                 </p>
-                                <p><strong>Author:</strong> <?php echo htmlspecialchars($ebook['author']); ?></p>
                                 <p><strong>Unit:</strong> <?php echo htmlspecialchars($ebook['unit_name'] ?? 'N/A'); ?></p>
+                                <p><strong>Author:</strong> <?php echo htmlspecialchars($ebook['author']); ?></p>
                                 <p><?php echo htmlspecialchars(substr($ebook['description'] ?? 'No description', 0, 100)) . '...'; ?></p>
                                 <div style="display: flex; justify-content: space-between; margin-top: 1rem;">
                                     <span><?php echo $ebook['pages']; ?> pages</span>
                                     <span>Preview: <?php echo $ebook['preview_pages']; ?> pages</span>
                                 </div>
-                                <div style="margin-top: 1rem;">
+                                <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
                                     <button class="btn edit-ebook" 
                                             data-id="<?php echo $ebook['id']; ?>" 
+                                            data-unit="<?php echo $ebook['unit_id']; ?>" 
                                             data-title="<?php echo htmlspecialchars($ebook['title']); ?>" 
                                             data-author="<?php echo htmlspecialchars($ebook['author']); ?>" 
                                             data-description="<?php echo htmlspecialchars($ebook['description'] ?? ''); ?>" 
                                             data-price="<?php echo $ebook['price']; ?>" 
                                             data-pages="<?php echo $ebook['pages']; ?>" 
                                             data-preview="<?php echo $ebook['preview_pages']; ?>" 
-                                            data-unit="<?php echo $ebook['unit_id']; ?>" 
                                             data-access="<?php echo $ebook['access_level']; ?>" 
-                                            style="flex: 1; margin-right: 0.5rem;">Edit</button>
+                                            style="flex: 1; padding: 0.25rem 0.5rem; font-size: 0.8rem;">Edit</button>
                                     <form method="POST" style="flex: 1; margin: 0;">
                                         <input type="hidden" name="ebook_id" value="<?php echo $ebook['id']; ?>">
-                                        <button type="submit" name="delete_ebook" class="btn btn-secondary" onclick="return confirm('Are you sure you want to delete this e-book?')">Delete</button>
+                                        <button type="submit" name="delete_ebook" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; width: 100%;" onclick="return confirm('Are you sure you want to delete this e-book?')">Delete</button>
                                     </form>
                                 </div>
                             </div>
@@ -385,7 +396,7 @@ foreach ($courses as $course) {
                     <label for="edit-unit-id">Unit *</label>
                     <select id="edit-unit-id" name="unit_id" class="form-control" required>
                         <option value="">Select a unit</option>
-                        <?php foreach ($programCourses as $programData): ?>
+                        <?php foreach ($programCourses as $programId => $programData): ?>
                             <?php if (!empty($programData['courses'])): ?>
                                 <optgroup label="<?php echo htmlspecialchars($programData['program']['name'] ?? 'N/A'); ?> (<?php echo htmlspecialchars($programData['program']['department_name'] ?? 'N/A'); ?>)">
                                     <?php foreach ($programData['courses'] as $course): ?>
@@ -559,23 +570,23 @@ foreach ($courses as $course) {
             editButtons.forEach(button => {
                 button.addEventListener('click', function() {
                     const id = this.getAttribute('data-id');
+                    const unit = this.getAttribute('data-unit');
                     const title = this.getAttribute('data-title');
                     const author = this.getAttribute('data-author');
                     const description = this.getAttribute('data-description');
                     const price = this.getAttribute('data-price');
                     const pages = this.getAttribute('data-pages');
                     const preview = this.getAttribute('data-preview');
-                    const unit = this.getAttribute('data-unit');
                     const access = this.getAttribute('data-access');
                     
                     document.getElementById('edit-ebook-id').value = id;
+                    document.getElementById('edit-unit-id').value = unit;
                     document.getElementById('edit-title').value = title;
                     document.getElementById('edit-author').value = author;
                     document.getElementById('edit-description').value = description;
                     document.getElementById('edit-price').value = price;
                     document.getElementById('edit-pages').value = pages;
                     document.getElementById('edit-preview-pages').value = preview;
-                    document.getElementById('edit-unit-id').value = unit;
                     document.getElementById('edit-access-level').value = access;
                     
                     editModal.style.display = 'flex';

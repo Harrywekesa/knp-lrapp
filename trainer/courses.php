@@ -6,69 +6,23 @@ redirectIfNotAllowed('trainer');
 $user = getUserById($_SESSION['user_id']);
 $theme = getThemeSettings();
 
-// Handle course actions
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['create_course'])) {
-        $program_id = $_POST['program_id'];
-        $name = $_POST['name'];
-        $code = $_POST['code'];
-        $description = $_POST['description'];
-        $year = $_POST['year'];
-        $semester = $_POST['semester'];
-        $credits = $_POST['credits'];
-        
-        if (createCourse($program_id, $name, $code, $description, $year, $semester, $credits)) {
-            $success = "Course created successfully";
-        } else {
-            $error = "Failed to create course";
-        }
-    } elseif (isset($_POST['update_course'])) {
-        $id = $_POST['course_id'];
-        $program_id = $_POST['program_id'];
-        $name = $_POST['name'];
-        $code = $_POST['code'];
-        $description = $_POST['description'];
-        $year = $_POST['year'];
-        $semester = $_POST['semester'];
-        $credits = $_POST['credits'];
-        
-        if (updateCourse($id, $name, $code, $description, $year, $semester, $credits)) {
-            $success = "Course updated successfully";
-        } else {
-            $error = "Failed to update course";
-        }
-    } elseif (isset($_POST['delete_course'])) {
-        $id = $_POST['course_id'];
-        
-        if (deleteCourse($id)) {
-            $success = "Course deleted successfully";
-        } else {
-            $error = "Failed to delete course";
-        }
-    }
-}
-
 // Get courses taught by this trainer
 $courses = getCoursesByTrainer($user['id']);
 
 // Get all programs for reference
-$programs = getAllPrograms();
+$allPrograms = getAllPrograms();
 
-// Group programs by department and level
+// Group programs by department
 $departmentPrograms = [];
-foreach ($programs as $program) {
+foreach ($allPrograms as $program) {
     $deptId = $program['department_id'];
-    $level = $program['level'];
     if (!isset($departmentPrograms[$deptId])) {
         $departmentPrograms[$deptId] = [
             'department' => getDepartmentById($deptId),
-            'levels' => []
+            'programs' => []
         ];
     }
-    if (!isset($departmentPrograms[$deptId]['levels'][$level])) {
-        $departmentPrograms[$deptId]['levels'][$level] = [];
-    }
-    $departmentPrograms[$deptId]['levels'][$level][] = $program;
+    $departmentPrograms[$deptId]['programs'][] = $program;
 }
 
 // Level display names
@@ -108,7 +62,6 @@ $levelNames = [
                     <li><a href="live_classes.php">Live Classes</a></li>
                     <li><a href="assignments.php">Assignments</a></li>
                     <li><a href="forum.php">Discussion Forum</a></li>
-                    <li><a href="ai_assistant.php">Your AI Assistant</a></li>
                     <li><a href="profile.php">Profile</a></li>
                     <li><a href="../logout.php">Logout</a></li>
                 </ul>
@@ -121,16 +74,8 @@ $levelNames = [
             <div class="card">
                 <div class="card-header">
                     <h2>My Courses</h2>
-                    <p>Create and manage your academic courses</p>
+                    <p>Courses you are teaching</p>
                 </div>
-                
-                <?php if (isset($success)): ?>
-                    <div class="alert alert-success"><?php echo $success; ?></div>
-                <?php endif; ?>
-                
-                <?php if (isset($error)): ?>
-                    <div class="alert alert-error"><?php echo $error; ?></div>
-                <?php endif; ?>
                 
                 <button id="show-create-form" class="btn" style="margin-bottom: 1.5rem;">Create New Course</button>
                 
@@ -138,12 +83,12 @@ $levelNames = [
                     <div class="card-header">
                         <h3>Create New Course</h3>
                     </div>
-                    <form method="POST">
+                    <form method="POST" action="create_course.php">
                         <div class="form-group">
                             <label for="program_id">Program *</label>
                             <select id="program_id" name="program_id" class="form-control" required>
                                 <option value="">Select a program</option>
-                                <?php foreach ($programs as $program): ?>
+                                <?php foreach ($allPrograms as $program): ?>
                                 <option value="<?php echo $program['id']; ?>">
                                     <?php echo htmlspecialchars($program['name']); ?> 
                                     (<?php echo htmlspecialchars($program['department_name']); ?>)
@@ -231,21 +176,12 @@ $levelNames = [
                             <div class="course-card-content">
                                 <p><?php echo htmlspecialchars(substr($course['description'] ?? 'No description available', 0, 100)) . '...'; ?></p>
                                 <div style="display: flex; justify-content: space-between; margin-top: 1rem;">
-                                    <span>Year <?php echo $course['year']; ?>, Sem <?php echo $course['semester']; ?></span>
+                                    <span>Y<?php echo $course['year']; ?>/S<?php echo $course['semester']; ?></span>
                                     <span><?php echo $course['credits']; ?> credits</span>
                                 </div>
-                                <div style="margin-top: 1rem;">
-                                    <a href="course.php?id=<?php echo $course['id']; ?>" class="btn" style="flex: 1; margin-right: 0.5rem;">View Details</a>
-                                    <button class="btn edit-course" 
-                                            data-id="<?php echo $course['id']; ?>" 
-                                            data-program="<?php echo $course['program_id']; ?>" 
-                                            data-name="<?php echo htmlspecialchars($course['name']); ?>" 
-                                            data-code="<?php echo htmlspecialchars($course['code']); ?>" 
-                                            data-description="<?php echo htmlspecialchars($course['description'] ?? ''); ?>" 
-                                            data-year="<?php echo $course['year']; ?>" 
-                                            data-semester="<?php echo $course['semester']; ?>" 
-                                            data-credits="<?php echo $course['credits']; ?>" 
-                                            style="flex: 1; margin-left: 0.5rem;">Edit</button>
+                                <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+                                    <a href="course.php?id=<?php echo $course['id']; ?>" class="btn" style="flex: 1;">View Details</a>
+                                    <a href="edit_course.php?id=<?php echo $course['id']; ?>" class="btn btn-secondary" style="flex: 1;">Edit</a>
                                 </div>
                             </div>
                         </div>
@@ -266,25 +202,18 @@ $levelNames = [
                         <?php echo htmlspecialchars($deptData['department']['name']); ?>
                     </h3>
                     
-                    <?php foreach ($deptData['levels'] as $level => $levelPrograms): ?>
+                    <?php foreach ($deptData['programs'] as $program): ?>
                     <div class="card" style="margin-bottom: 1.5rem; border-left: 3px solid var(--accent-color);">
-                        <h4 style="margin: 0 0 1rem 0; color: var(--accent-color);"><?php echo $levelNames[$level] ?? ucfirst($level); ?></h4>
-                        <div class="grid">
-                            <?php foreach ($levelPrograms as $program): ?>
-                            <div class="program-card">
-                                <div style="background: #ddd; height: 120px; display: flex; align-items: center; justify-content: center; border-radius: 4px 4px 0 0;">
-                                    <?php echo htmlspecialchars($program['code']); ?>
-                                </div>
-                                <div class="program-card-content">
-                                    <h4><?php echo htmlspecialchars($program['name']); ?></h4>
-                                    <p><?php echo htmlspecialchars(substr($program['description'] ?? 'No description available', 0, 80)) . '...'; ?></p>
-                                    <div style="display: flex; justify-content: space-between; margin-top: 1rem;">
-                                        <span><?php echo $program['duration']; ?> years</span>
-                                        <a href="program.php?id=<?php echo $program['id']; ?>" class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">View Units</a>
-                                    </div>
-                                </div>
-                            </div>
-                            <?php endforeach; ?>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h4 style="margin: 0; color: var(--accent-color);">
+                                <?php echo htmlspecialchars($program['name']); ?> (<?php echo htmlspecialchars($program['code']); ?>)
+                            </h4>
+                            <span><?php echo $program['duration']; ?> years</span>
+                        </div>
+                        <p><?php echo htmlspecialchars(substr($program['description'] ?? 'No description available', 0, 150)) . '...'; ?></p>
+                        <div style="display: flex; justify-content: space-between; margin-top: 1rem;">
+                            <span><?php echo $levelNames[$program['level']] ?? ucfirst($program['level']); ?></span>
+                            <a href="program.php?id=<?php echo $program['id']; ?>" class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">View Units</a>
                         </div>
                     </div>
                     <?php endforeach; ?>
@@ -293,85 +222,6 @@ $levelNames = [
             </div>
         </div>
     </main>
-
-    <!-- Edit Course Modal -->
-    <div id="edit-course-modal" class="modal" style="display: none;">
-        <div class="card" style="width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto;">
-            <div class="card-header">
-                <h3>Edit Course</h3>
-            </div>
-            <form method="POST">
-                <input type="hidden" id="edit-course-id" name="course_id">
-                <div class="form-group">
-                    <label for="edit-program-id">Program *</label>
-                    <select id="edit-program-id" name="program_id" class="form-control" required>
-                        <option value="">Select a program</option>
-                        <?php foreach ($programs as $program): ?>
-                        <option value="<?php echo $program['id']; ?>">
-                            <?php echo htmlspecialchars($program['name']); ?> 
-                            (<?php echo htmlspecialchars($program['department_name']); ?>)
-                        </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                
-                <div class="form-row">
-                    <div class="form-col">
-                        <div class="form-group">
-                            <label for="edit-name">Course Name *</label>
-                            <input type="text" id="edit-name" name="name" class="form-control" required>
-                        </div>
-                    </div>
-                    <div class="form-col">
-                        <div class="form-group">
-                            <label for="edit-code">Course Code *</label>
-                            <input type="text" id="edit-code" name="code" class="form-control" required>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="form-row">
-                    <div class="form-col">
-                        <div class="form-group">
-                            <label for="edit-year">Year *</label>
-                            <select id="edit-year" name="year" class="form-control" required>
-                                <option value="1">Year 1</option>
-                                <option value="2">Year 2</option>
-                                <option value="3">Year 3</option>
-                                <option value="4">Year 4</option>
-                                <option value="5">Year 5</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-col">
-                        <div class="form-group">
-                            <label for="edit-semester">Semester *</label>
-                            <select id="edit-semester" name="semester" class="form-control" required>
-                                <option value="1">Semester 1</option>
-                                <option value="2">Semester 2</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-col">
-                        <div class="form-group">
-                            <label for="edit-credits">Credits *</label>
-                            <input type="number" id="edit-credits" name="credits" class="form-control" min="1" max="20" required>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="edit-description">Description</label>
-                    <textarea id="edit-description" name="description" class="form-control" rows="3"></textarea>
-                </div>
-                
-                <div class="form-group">
-                    <button type="submit" name="update_course" class="btn">Update Course</button>
-                    <button type="button" id="close-modal" class="btn btn-secondary" style="margin-left: 1rem;">Cancel</button>
-                </div>
-            </form>
-        </div>
-    </div>
 
     <footer class="footer mt-auto py-3 bg-dark text-light">
         <div class="container">
@@ -401,8 +251,25 @@ $levelNames = [
             border-bottom: 2px solid white;
         }
         
-        .modal {
-            display: none;
+        .course-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+            transition: transform 0.3s;
+        }
+        
+        .course-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .course-card-content {
+            padding: 1rem;
+        }
+        
+        .course-card-content h3 {
+            margin-bottom: 0.5rem;
+            color: var(--primary-color);
         }
         
         .form-row {
@@ -414,7 +281,7 @@ $levelNames = [
         .form-col {
             flex: 1;
             padding: 0 0.5rem;
-            min-width: 200px;
+            min-width: 250px;
         }
         
         @media (max-width: 768px) {
@@ -429,8 +296,6 @@ $levelNames = [
             const showFormBtn = document.getElementById('show-create-form');
             const createForm = document.getElementById('create-course-form');
             const cancelBtn = document.getElementById('cancel-create');
-            const editModal = document.getElementById('edit-course-modal');
-            const closeModalBtn = document.getElementById('close-modal');
             
             showFormBtn.addEventListener('click', function() {
                 createForm.style.display = 'block';
@@ -440,43 +305,6 @@ $levelNames = [
             cancelBtn.addEventListener('click', function() {
                 createForm.style.display = 'none';
                 showFormBtn.style.display = 'inline-block';
-            });
-            
-            // Edit course functionality
-            const editButtons = document.querySelectorAll('.edit-course');
-            editButtons.forEach(button => {
-                button.addEventListener('click', function() {
-                    const id = this.getAttribute('data-id');
-                    const program = this.getAttribute('data-program');
-                    const name = this.getAttribute('data-name');
-                    const code = this.getAttribute('data-code');
-                    const description = this.getAttribute('data-description');
-                    const year = this.getAttribute('data-year');
-                    const semester = this.getAttribute('data-semester');
-                    const credits = this.getAttribute('data-credits');
-                    
-                    document.getElementById('edit-course-id').value = id;
-                    document.getElementById('edit-program-id').value = program;
-                    document.getElementById('edit-name').value = name;
-                    document.getElementById('edit-code').value = code;
-                    document.getElementById('edit-description').value = description;
-                    document.getElementById('edit-year').value = year;
-                    document.getElementById('edit-semester').value = semester;
-                    document.getElementById('edit-credits').value = credits;
-                    
-                    editModal.style.display = 'flex';
-                });
-            });
-            
-            closeModalBtn.addEventListener('click', function() {
-                editModal.style.display = 'none';
-            });
-            
-            // Close modal when clicking outside
-            window.addEventListener('click', function(event) {
-                if (event.target === editModal) {
-                    editModal.style.display = 'none';
-                }
             });
         });
     </script>
